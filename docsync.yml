@@ -1,0 +1,75 @@
+rules:
+- name: custom-cli-guide
+  sources:
+  - Sources/X8CLI/X8CLI.swift
+  - Examples/CustomStorageCLI/Sources/ExampleCache/ExampleCache.swift
+  - Examples/CustomStorageCLI/Package.swift
+  doc: Sources/X8CLI/X8CLI.docc/CreatingACustomCLI.md
+  message: Shared CLI entry points changed - verify the custom executable guide and
+    example.
+  checksum: 5d1bd0146623eb656aa55cbfb1d4330864c339afc6ad0d4c7d59797d9450de94
+- name: custom-cli-configuration
+  sources:
+  - Sources/X8CLI/X8CLIConfiguration.swift
+  - Sources/X8CLI/X8ProfileIDValidator.swift
+  - Sources/X8CLI/X8ConfigurationResolution.swift
+  doc: Sources/X8CLI/X8CLI.docc/ConnectingConfiguration.md
+  message: CLI configuration contracts changed - verify configuration ownership and
+    validation documentation.
+  checksum: 6357e95d03ee66f05e8fd376ca53ec7763677ce06630eb236de50969bf91211b
+- name: custom-cli-lifetime
+  sources:
+  - Sources/X8CLI/X8StorageScope.swift
+  - Sources/X8CLI/X8ConfiguredStorage.swift
+  - Sources/X8CLI/ServeCommand.swift
+  - Sources/X8CLI/XcodeBuildCommand.swift
+  - Sources/X8CLI/CachePurgeCommand.swift
+  doc: Sources/X8CLI/X8CLI.docc/StorageLifetime.md
+  message: Storage ownership or capabilities changed - verify lifetime and administration
+    documentation.
+  checksum: 136ea9ad3d7cee1855729bb43cc921076bb37f648be6afef469653cae42f8f6a
+- name: readme-cli
+  sources:
+  - Sources/X8CLI/XcodeBuildArguments.swift
+  - Sources/X8CLI/X8RootCommand.swift
+  - Sources/x8/x8.swift
+  - Sources/X8CLI/XcodeBuildCommand.swift
+  - Sources/X8CLI/ServeCommand.swift
+  - Sources/X8CLI/CacheCommand.swift
+  - Sources/X8CLI/CachePurgeCommand.swift
+  - Sources/X8CLI/ConfigCommand.swift
+  - Sources/X8CLI/StatsCommand.swift
+  - Sources/X8CLI/DoctorCommand.swift
+  doc: README.md
+  message: CLI command surface changed - update the README Commands table and Enabling
+    the remote cache section if commands, flags, or usage changed.
+  checksum: d64a3c979fd1048a0ccfc6cbd49675777f201ded786e1d03fa3fa314c545dcdf
+- name: readme-configuration
+  sources:
+  - Sources/X8Config/X8ConfigurationDocument.swift
+  - Sources/X8Config/X8ConfigurationResolver.swift
+  - Sources/X8Config/X8ConfigurationDecoder.swift
+  - Sources/X8Config/X8ConfigurationMerger.swift
+  - Sources/X8Config/X8Configuration.swift
+  doc: README.md
+  message: .x8.yml configuration schema changed - update the README Setup and Configuration
+    sections if fields, defaults, or validation changed.
+  checksum: 8aa26d63321a74c003c0e7308ef565c91b346113a5441ee0a6aaf189aa0a424c
+- name: prefix-mapping
+  sources:
+  - Sources/X8CLI/XcodeBuildArguments.swift
+  - Sources/X8CLI/XcodeBuildCommand.swift
+  - Sources/X8Kit/Server/XcodeCacheEnvironment.swift
+  - Protos/compilation_cache_service/keyvalue/v1/compilation_caching_kv.proto
+  doc: Sources/X8Kit/X8Kit.docc/PrefixMapping.md
+  message: Cache argument or protocol boundaries changed - verify path preservation,
+    prefix mapping limits, and the scope of portability claims.
+  checksum: 4ea494fc2ce5117715050ff08d8edc38e4893c4f69f368ed19d04a6863f1211e
+excludes:
+- '**/.build/**'
+- .git/**
+- '**/.swiftpm/**'
+- '**/node_modules/**'
+- docs/**
+- .superpowers/**
+- Sources/*/*.docc/Resources/**
