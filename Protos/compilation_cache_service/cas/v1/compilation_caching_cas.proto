@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.apple.dt.compilation_cache_service";
+option java_outer_classname = "CompilationCachingProto";
+option objc_class_prefix = "CCS";
+
+package compilation_cache_service.cas.v1;
+
+message CASDataID {
+  bytes id = 1;
+}
+
+message CASObject {
+  CASBytes blob = 1;
+  repeated CASDataID references = 2;
+}
+
+message CASBlob {
+  CASBytes blob = 1;
+}
+
+message CASBytes {
+  oneof contents {
+    bytes data = 1;
+    string file_path = 2;
+  }
+}
+
+service CASDBService {
+  rpc Get(CASGetRequest) returns (CASGetResponse) {}
+  rpc Put(CASPutRequest) returns (CASPutResponse) {}
+  rpc Load(CASLoadRequest) returns (CASLoadResponse) {}
+  rpc Save(CASSaveRequest) returns (CASSaveResponse) {}
+}
+
+message ResponseError {
+  string description = 1;
+}
+
+message CASPutRequest {
+  CASObject data = 1;
+}
+
+message CASPutResponse {
+  oneof contents {
+    ResponseError error = 1;
+    CASDataID cas_id = 2;
+  }
+}
+
+message CASGetRequest {
+  CASDataID cas_id = 1;
+  bool write_to_disk = 2;
+}
+
+message CASGetResponse {
+  enum Outcome {
+    ERROR = 0;
+    OBJECT_NOT_FOUND = 1;
+    SUCCESS = 2;
+  }
+  Outcome outcome = 1;
+  oneof contents {
+    ResponseError error = 2;
+    CASObject data = 3;
+  }
+}
+
+message CASSaveRequest {
+  CASBlob data = 1;
+}
+
+message CASSaveResponse {
+  oneof contents {
+    ResponseError error = 1;
+    CASDataID cas_id = 2;
+  }
+}
+
+message CASLoadRequest {
+  CASDataID cas_id = 1;
+  bool write_to_disk = 2;
+}
+
+message CASLoadResponse {
+  enum Outcome {
+    ERROR = 0;
+    OBJECT_NOT_FOUND = 1;
+    SUCCESS = 2;
+  }
+  Outcome outcome = 1;
+  oneof contents {
+    ResponseError error = 2;
+    CASBlob data = 3;
+  }
+}
