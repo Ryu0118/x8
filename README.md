@@ -5,11 +5,11 @@
 [![Test](https://github.com/Ryu0118/x8/actions/workflows/test.yml/badge.svg)](https://github.com/Ryu0118/x8/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-6.1-F05138?logo=swift&logoColor=white)](https://swift.org)
-[![Platform](https://img.shields.io/badge/platform-macOS%2015%2B-lightgrey)](https://developer.apple.com/macos/)
+[![Platform](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey)](https://developer.apple.com/macos/)
 
 **[Full API documentation →](https://ryu0118.github.io/x8/documentation/x8kit/)**
 
-Xcode's built-in Compilation Cache (Xcode 27+) only caches locally — every
+Xcode's built-in Compilation Cache only caches locally — every
 machine still compiles from scratch. x8 gives Xcode a *remote* compilation
 cache: it speaks Xcode's cache protocol over a local Unix domain socket and
 stores the objects in AWS S3, Cloudflare R2, or any other S3-compatible
@@ -29,13 +29,6 @@ talk to a local socket instead of nothing. x8 listens on that socket, speaks
 the same gRPC protocol Xcode's plugin expects, and translates each cache
 lookup or upload into an S3 `GetObject`/`PutObject` call against your bucket.
 
-## Requirements
-
-- **Xcode 27 or later.** Xcode 26 crashes on cached, prefix-mapped batch
-  diagnostics; see [Toolchain support](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#toolchain-support).
-- **macOS 15 or later** for the `x8` binary itself.
-- **An S3-compatible bucket** — AWS S3, Cloudflare R2, MinIO, or similar.
-
 ## Known limitations
 
 - **Macro plugins:** a target that loads a Swift macro can miss the cache
@@ -54,6 +47,11 @@ workflows publish the DocC site, verify docsync checksums, and scan for
 leaked secrets.
 
 ## Installation
+
+x8 needs Xcode 27 or later (which itself requires macOS 26) and an
+S3-compatible bucket — AWS S3, Cloudflare R2, MinIO, or similar. Xcode 26
+crashes on cached, prefix-mapped builds; see
+[Toolchain support](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#toolchain-support).
 
 Each [GitHub Release](https://github.com/Ryu0118/x8/releases) publishes a
 darwin universal binary archive and a SwiftPM `.artifactbundle`.
