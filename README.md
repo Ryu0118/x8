@@ -36,15 +36,6 @@ lookup or upload into an S3 `GetObject`/`PutObject` call against your bucket.
 - **Package trait ordering:** a change in the order of trait-derived `-D`
   flags alone changes a compile key; see [package trait ordering](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#known-limitation-package-trait-ordering).
 
-## Status
-
-CI runs SwiftFormat, SwiftLint, and AST lint, then builds and tests with the
-S3 trait on and off. The 193 Swift Testing cases across eight test targets
-include integration suites (`X8KitIntegrationTests`,
-`X8S3Tests/S3LocalIntegrationTests`, `X8CLIIntegrationTests`). Separate
-workflows publish the DocC site, verify docsync checksums, and scan for
-leaked secrets.
-
 ## Installation
 
 x8 needs Xcode 27 or later (which itself requires macOS 26) and an
