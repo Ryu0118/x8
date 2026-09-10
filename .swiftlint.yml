@@ -1,0 +1,52 @@
+# SwiftLint configuration for x8.
+
+excluded:
+  - .build
+  - .swiftpm
+  - Sources/X8Kit/Generated
+  - "**/.build/**"
+  - "**/.swiftpm/**"
+
+included:
+  - Sources
+  - Tests
+  - Package.swift
+
+disabled_rules:
+  - trailing_comma
+  - opening_brace
+  - modifier_order
+  - trailing_whitespace
+  - vertical_whitespace
+  - colon
+  - void_return
+  - comma
+  - prefer_self_in_static_references
+  - redundant_nil_coalescing
+  - force_unwrapping
+  - force_try
+  - identifier_name
+  - line_length
+  - type_body_length
+  - file_length
+  - function_body_length
+  - cyclomatic_complexity
+  - large_tuple
+  - trailing_closure
+  - unneeded_synthesized_initializer
+  - for_where
+  - redundant_discardable_let
+  - optional_data_string_conversion
+  - enum_case_associated_values_count
+
+type_name:
+  min_length: 3
+  max_length: 60
+
+nesting:
+  type_level: 3
+  function_level: 5
+
+function_parameter_count:
+  warning: 8
+  error: 10

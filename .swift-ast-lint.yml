@@ -1,0 +1,69 @@
+included_paths:
+  - "Sources/**/*.swift"
+  - "Tests/**/*.swift"
+
+excluded_paths:
+  - ".build/**"
+  - ".swiftpm/**"
+  - "**/.build/**"
+  - "**/.swiftpm/**"
+  - "**/Generated/**"
+  - "**/Fixtures/**"
+
+rules:
+  deep-nesting:
+    args:
+      warning_depth: 2
+      error_depth: 3
+  # Keep the requested 30-line boundary for both public and package types.
+  single-large-type-per-file:
+    args:
+      warning_lines: 30
+      error_lines: 30
+    include:
+      - "Sources/**"
+      - "Tests/**"
+    exclude:
+      - "**/*Generated.swift"
+      - "**/Fixtures/**"
+  property-declaration-ordering:
+    args:
+      severity: error
+  function-access-modifier-grouping:
+    args:
+      severity: error
+  swiftui-view-property:
+    args:
+      severity: error
+  branch-assignment-to-tuple:
+    args:
+      severity: error
+  no-top-level-function:
+    args:
+      severity: error
+  return-if-expression:
+    args:
+      severity: error
+  return-switch-expression:
+    args:
+      severity: error
+  use-url-file-path:
+    args:
+      severity: error
+  meaningful-suite-description:
+    args:
+      severity: error
+  test-function-naming:
+    args:
+      severity: error
+      check_spaces: true
+      check_underscores: true
+      check_test_prefix: true
+  test-description-duplicates-name:
+    args:
+      severity: error
+  missing-docs:
+    args:
+      min_access_level: package
+      severity: error
+      ignore_patterns: []
