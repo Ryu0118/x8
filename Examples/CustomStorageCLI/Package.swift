@@ -4,7 +4,9 @@ import PackageDescription
 
 let package = Package(
     name: "CustomStorageCLI",
-    platforms: [.macOS(.v15)],
+    // Must match the X8 package's deployment target; SwiftPM rejects a
+    // dependent with a lower minimum than the products it links.
+    platforms: [.macOS("26.0")],
     dependencies: [.package(path: "../..", traits: [])],
     targets: [
         .executableTarget(
