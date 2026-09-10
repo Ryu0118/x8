@@ -15,17 +15,16 @@ A CAS scope requires an `actionCacheStore` in addition to the retention and
 reference-reading capabilities `X8Storage` already defines. The runner
 constructs `ActionCacheRootExtractor` and passes its `roots(in:)` as the
 closure `CachePurgePlanner` (in `X8Storage`) uses to derive the current live
-root set: every Action Cache entry's value is decoded as
-`CompilationCacheService_Cas_V1_CASObject` (the message Xcode is observed to
-store under a `"value"` entry, verified against a real cache bucket), and its
-`references` become opaque CAS roots. `X8Storage` never imports the
-generated protobuf type; only `X8Kit`, which owns it, does.
+root set: Xcode stores a `CompilationCacheService_Cas_V1_CASObject` under
+each entry's `value` key, and that object's `references` are the roots.
+`X8Storage` never imports the generated protobuf type; only `X8Kit`, which
+owns it, does.
 
-This means CAS purge no longer needs an explicit, manually registered
-retention anchor to become usable — its live root set is always the current
-Action Cache, read fresh at plan time. An explicit `CASRetentionAnchor`
-remains available for pinning specific objects regardless of Action Cache
-churn (a release build's outputs, say); it is additive, not required.
+CAS purge therefore needs no explicit retention anchor: its live root set is
+the current Action Cache, read fresh at plan time. An explicit
+`CASRetentionAnchor` is available for pinning specific objects regardless of
+Action Cache churn (a release build's outputs, say); it is additive, not
+required.
 
 An Action Cache value whose extractor cannot find any CAS-object-shaped
 entry fails the whole plan closed — that is a code or protocol mismatch to

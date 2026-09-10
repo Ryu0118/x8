@@ -44,11 +44,6 @@ handle keeps the standalone server session alive. A foreground command can
 wait for `SIGINT` or `SIGTERM` through `waitForTerminationSignal()`, while a
 supervisor can call `shutdown()` directly.
 
-The lifecycle coordinator is a value that captures readiness policy and the
-injected filesystem. This keeps timeout behavior and cleanup dependencies
-together without serializing the coordinator as an actor; per-request mutable
-startup state remains isolated in its own actor.
-
 The stable socket path is only a client endpoint. Cache sharing and isolation
 come from the storage configuration, such as the bucket and opaque Xcode
 identifiers; changing the socket path does not rename cache records.

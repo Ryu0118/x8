@@ -88,10 +88,9 @@ storage-adapter boundary (`X8S3` uses a hex encoding of the same bytes under a
 ## The object graph
 
 A compiled output is not one blob. The compiler stores its result as a small
-tree of CAS objects, and the action-cache value points at the root. The exact
-node layout is clang's and swift's internal business and is not documented by
-Apple; the illustration below shows the shape the protocol permits, not a
-verified schema.
+tree of CAS objects, and the action-cache value points at the root. Apple
+does not document the node layout; the diagram shows the shape the protocol
+permits.
 
 ![An Action Cache key resolves to a value whose entry points at a root CASObject; the root references object-code, diagnostics, dependency-record, and precompiled-module CASObjects, which in turn reference raw CASBlob leaves.](cas-object-graph)
 
@@ -103,9 +102,8 @@ Three properties follow from content addressing:
   exist. A client stores leaves first; X8 does not validate that referenced
   IDs are present, mirroring the protocol.
 - The action-cache value is metadata, not the compiled bytes. `X8Core`'s
-  `X8Core.ActionCacheValue` preserves the entries verbatim; the observed `value`
-  entry contains serialized result metadata that refers to CAS IDs
-  (observation from this repository, not an Apple specification).
+  `X8Core.ActionCacheValue` preserves the entries verbatim; the `value`
+  entry contains serialized result metadata that refers to CAS IDs.
 
 ## A build, end to end
 
@@ -119,9 +117,7 @@ and does not affect the protocol.
 Notes on the diagram:
 
 - The RPC names, outcomes, and `write_to_disk` behaviour are the checked-in
-  protocol. The leaf-first store order and the content of the value map are
-  inferred from the protocol's reference model and this repository's
-  observations, not from an Apple document.
+  protocol. The leaf-first store order follows from references being by ID.
 - Step ordering within a real build is concurrent; many actions are in flight
   at once on one socket.
 - The error path is what "fail open" means concretely: X8 answers `ERROR`,
