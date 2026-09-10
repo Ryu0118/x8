@@ -2,18 +2,19 @@
 
 **An S3-compatible remote compilation cache proxy for Xcode.**
 
+[![Test](https://github.com/Ryu0118/x8/actions/workflows/test.yml/badge.svg)](https://github.com/Ryu0118/x8/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-6.1-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![Platform](https://img.shields.io/badge/platform-macOS%2015%2B-lightgrey)](https://developer.apple.com/macos/)
 
 **[Full API documentation →](https://ryu0118.github.io/x8/documentation/x8kit/)**
 
-Xcode 26 ships a built-in Compilation Cache, but it only caches locally —
-every machine still compiles from scratch. x8 gives Xcode a *remote*
-compilation cache: it speaks Xcode's cache protocol over a local Unix domain
-socket and stores the objects in AWS S3, Cloudflare R2, or any other
-S3-compatible bucket, so a team or CI can share compiled Swift/Clang module
-outputs instead of every machine recompiling them.
+Xcode's built-in Compilation Cache (Xcode 27+) only caches locally — every
+machine still compiles from scratch. x8 gives Xcode a *remote* compilation
+cache: it speaks Xcode's cache protocol over a local Unix domain socket and
+stores the objects in AWS S3, Cloudflare R2, or any other S3-compatible
+bucket, so a team or CI can share compiled Swift/Clang module outputs instead
+of every machine recompiling them.
 
 ## How it works
 
@@ -28,20 +29,82 @@ talk to a local socket instead of nothing. x8 listens on that socket, speaks
 the same gRPC protocol Xcode's plugin expects, and translates each cache
 lookup or upload into an S3 `GetObject`/`PutObject` call against your bucket.
 
-## Enabling the remote cache
+## Requirements
 
-X8 targets **Xcode 27 or later** for compilation-cache integration; Xcode 26
-is unsupported. The prefix-mapped batch-diagnostics crash is fixed in the
-**Swift 6.4 release branch** ([Swift PR #90700](https://github.com/swiftlang/swift/pull/90700)).
-Xcode 27 beta 1 passed our minimal crash reproducer, but full application
-compatibility and cross-worktree cache reuse are not yet verified. See
-[toolchain support and evidence](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#toolchain-support-and-evidence).
-This is a support policy, not a CLI version check. The Swift 6.1 package-tools
-version describes building X8 itself, not the supported Xcode cache client.
-For macro-heavy targets, Xcode 27's prefix mapping is not sufficient by
-itself: generated macro plugin executables can differ between worktrees and
-therefore change Swift compile keys. See the `PrefixMapping` article linked
-above for the current evidence and measurement scope.
+- **Xcode 27 or later.** Xcode 26 crashes on cached, prefix-mapped batch
+  diagnostics; see [Toolchain support](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#toolchain-support).
+- **macOS 15 or later** for the `x8` binary itself.
+- **An S3-compatible bucket** — AWS S3, Cloudflare R2, MinIO, or similar.
+
+## Known limitations
+
+- **Macro plugins:** a target that loads a Swift macro can miss the cache
+  across worktrees because the generated plugin executable embeds a
+  build-output path; see [the macro-plugin limitation](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#known-limitation-generated-macro-plugin-executables).
+- **Package trait ordering:** a change in the order of trait-derived `-D`
+  flags alone changes a compile key; see [package trait ordering](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#known-limitation-package-trait-ordering).
+
+## Status
+
+CI runs SwiftFormat, SwiftLint, and AST lint, then builds and tests with the
+S3 trait on and off. The 193 Swift Testing cases across eight test targets
+include integration suites (`X8KitIntegrationTests`,
+`X8S3Tests/S3LocalIntegrationTests`, `X8CLIIntegrationTests`). Separate
+workflows publish the DocC site, verify docsync checksums, and scan for
+leaked secrets.
+
+## Installation
+
+Each [GitHub Release](https://github.com/Ryu0118/x8/releases) publishes a
+darwin universal binary archive and a SwiftPM `.artifactbundle`.
+
+### Nest ([mtj0928/nest](https://github.com/mtj0928/nest))
+
+```sh
+nest install Ryu0118/x8
+```
+
+### Mise ([jdx/mise](https://github.com/jdx/mise))
+
+```sh
+mise use -g github:Ryu0118/x8
+```
+
+## Setup
+
+1. Create `.x8.yml` at your project root:
+
+   ```yaml
+   version: 1
+   bucket: my-team-cache
+   # endpoint is optional for AWS S3 — omit it entirely and x8 uses AWS's
+   # default endpoint. Set it only for an S3-compatible provider (R2, etc.):
+   endpoint: https://<account-id>.r2.cloudflarestorage.com
+   ```
+
+2. Provide credentials. Every field in `.x8.yml` supports POSIX-style
+   `$VAR`/`${VAR}` expansion against the process environment, so static
+   credentials can be committed by reference:
+
+   ```yaml
+   accessKeyID: ${AWS_ACCESS_KEY_ID}
+   secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+   ```
+
+   Without static credentials, x8 uses the standard AWS credential provider
+   chain (environment, shared config file, SSO, `AssumeRole`,
+   container/instance metadata) — nothing to configure. Never commit a
+   *literal* secret value to `.x8.yml`; `$VAR` references are fine.
+
+3. Confirm everything is wired up:
+
+   ```sh
+   x8 doctor
+   ```
+
+4. Build — see [Enabling the remote cache](#enabling-the-remote-cache) below.
+
+## Enabling the remote cache
 
 There are two ways to point Xcode at x8's socket, depending on how you build.
 For command-line builds, `x8 xcodebuild` supplies the cache connection and
@@ -57,19 +120,18 @@ proxy. No `.xcconfig` or `project.pbxproj` edits required:
 x8 xcodebuild xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
 ```
 
-The first `xcodebuild` selects X8's subcommand; the second selects the child
+The first `xcodebuild` selects x8's subcommand; the second selects the child
 executable. The child can also be an absolute path ending in `xcodebuild`.
-X8 preserves the caller's build arguments and chosen directories.
+x8 preserves the caller's build arguments and chosen directories.
 
-x8 appends the three `COMPILATION_CACHE_*` settings and six prefix-mapping
-settings plus an empty `CLANG_MODULES_BUILD_SESSION_FILE` as `SETTING=VALUE`
-overrides. This omits a validation optimization whose physical path leaks into
-Swift cache keys; normal module validation remains. The wrapper maps its physical working
-directory to the shared `/^workspace` logical prefix while preserving the
-actual checkout and build paths. It does not inject or replace
-`-derivedDataPath`, `-clonedSourcePackagesDirPath`, or build-output settings.
-Pass `--no-prefix-mapping` (before the child `xcodebuild` argument) if your
-project manages these portability settings itself.
+x8 injects the cache connection and prefix-mapping settings as
+`SETTING=VALUE` overrides, mapping the working directory to the shared
+`/^workspace` logical prefix. It does not inject or replace
+`-derivedDataPath`, `-clonedSourcePackagesDirPath`, or build-output
+settings. Pass `--no-prefix-mapping` (before the child `xcodebuild`
+argument) if your project sets these portability settings itself. See
+[Prefix mapping](Sources/X8Kit/X8Kit.docc/PrefixMapping.md) for what each
+setting does.
 
 ### 2. Xcode.app's GUI — ten build settings
 
@@ -112,45 +174,11 @@ SWIFT_OTHER_PREFIX_MAPPINGS=$(PROJECT_TEMP_DIR)=/^derived $(BUILT_PRODUCTS_DIR)=
 
 Keep `x8 serve` running (e.g. under a LaunchAgent) and build from Xcode.app
 as usual. Use the same logical `/^workspace` replacement on every machine;
-neither mode relocates build outputs.
-See the `Launchd` article in the generated ``X8Kit``
-documentation (`Sources/X8Kit/X8Kit.docc/Launchd.md`) for the LaunchAgent
-template and the `launchctl` commands to start, stop, restart, and diagnose
-the service — there is no `x8 stop`; launchd owns that lifecycle.
-
-## Setup
-
-1. Create `.x8.yml` at your project root:
-
-   ```yaml
-   version: 1
-   bucket: my-team-cache
-   # endpoint is optional for AWS S3 — omit it entirely and x8 uses AWS's
-   # default endpoint. Set it only for an S3-compatible provider (R2, etc.):
-   endpoint: https://<account-id>.r2.cloudflarestorage.com
-   ```
-
-2. Provide credentials. Every field in `.x8.yml` supports POSIX-style
-   `$VAR`/`${VAR}` expansion against the process environment, so static
-   credentials can be committed by reference:
-
-   ```yaml
-   accessKeyID: ${AWS_ACCESS_KEY_ID}
-   secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
-   ```
-
-   Without static credentials, x8 falls back to Soto's standard credential
-   provider chain (environment, shared config file, SSO, `AssumeRole`,
-   container/instance metadata) — nothing to configure. Never commit a
-   *literal* secret value to `.x8.yml`; `$VAR` references are fine.
-
-3. Confirm everything is wired up:
-
-   ```sh
-   x8 doctor
-   ```
-
-4. Build — see [Enabling the remote cache](#enabling-the-remote-cache) above.
+neither mode relocates build outputs. The
+[Launchd guide](https://ryu0118.github.io/x8/documentation/x8kit/launchd)
+has the LaunchAgent template and the `launchctl` commands to start, stop,
+restart, and diagnose the service — there is no `x8 stop`; launchd owns that
+lifecycle.
 
 ## Configuration
 
@@ -161,7 +189,7 @@ the service — there is no `x8 stop`; launchd owns that lifecycle.
 | `region` | no | AWS region or provider-specific signing region. Defaults to `us-east-1`. |
 | `endpoint` | no | Custom endpoint for an S3-compatible provider (e.g. R2). Omit for AWS S3. |
 | `role` | no | `producer`, `consumer`, or `both`. Defaults to `both`. |
-| `accessKeyID` | no | Static access key ID. Omit to use Soto's standard credential provider chain. |
+| `accessKeyID` | no | Static access key ID. Omit to use the standard AWS credential provider chain. |
 | `secretAccessKey` | no | Static secret access key, paired with `accessKeyID`. Never commit a literal value — use `$VAR` expansion. |
 | `sessionToken` | no | Optional session token for temporary/STS credentials, paired with `accessKeyID`/`secretAccessKey`. |
 
@@ -204,23 +232,6 @@ role: consumer
 Run `x8 help <subcommand>` for full flag documentation. `cache purge`'s
 `--older-than` and `--grace-period` accept a number followed by `ms`, `s`,
 `m`, `h`, or `d` (for example `30m`, `2h`, or `7d`).
-
-## Installation
-
-Each [GitHub Release](https://github.com/Ryu0118/x8/releases) publishes a
-darwin universal binary archive and a SwiftPM `.artifactbundle`.
-
-### Nest ([mtj0928/nest](https://github.com/mtj0928/nest))
-
-```sh
-nest install Ryu0118/x8
-```
-
-### Mise ([jdx/mise](https://github.com/jdx/mise))
-
-```sh
-mise use -g github:Ryu0118/x8
-```
 
 ## Using another storage implementation
 
