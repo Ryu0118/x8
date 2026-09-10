@@ -9,12 +9,26 @@
 
 **[Full API documentation →](https://ryu0118.github.io/x8/documentation/x8kit/)**
 
-Xcode's built-in Compilation Cache only caches locally — every
-machine still compiles from scratch. x8 gives Xcode a *remote* compilation
-cache: it speaks Xcode's cache protocol over a local Unix domain socket and
-stores the objects in AWS S3, Cloudflare R2, or any other S3-compatible
-bucket, so a team or CI can share compiled Swift/Clang module outputs instead
-of every machine recompiling them.
+Xcode's built-in Compilation Cache only caches locally — every machine still
+compiles from scratch. x8 gives Xcode a *remote* compilation cache: it speaks
+Xcode's cache protocol over a local Unix domain socket and stores the objects
+in AWS S3, Cloudflare R2, or any other S3-compatible bucket, so a team or CI
+can share compiled Swift/Clang module outputs instead of every machine
+recompiling them.
+
+## Table of Contents
+
+- [How it works](#how-it-works)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Enabling the remote cache](#enabling-the-remote-cache)
+  - [`xcodebuild` / CI](#1-xcodebuild--ci--x8-xcodebuild)
+  - [Xcode.app's GUI](#2-xcodeapps-gui--ten-build-settings)
+- [Configuration](#configuration)
+- [Commands](#commands)
+- [Using another storage implementation](#using-another-storage-implementation)
+- [Documentation](#documentation)
+- [License](#license)
 
 ## How it works
 
@@ -23,10 +37,10 @@ of every machine recompiling them.
   <img alt="xcodebuild or Xcode.app talks the Compilation Cache protocol over a Unix socket to the x8 proxy, which issues GetObject and PutObject calls against an S3-compatible bucket" src="Diagrams/how-it-works.svg">
 </picture>
 
-Xcode's Compilation Cache plugin is told (via a handful of build settings) to
-talk to a local socket instead of nothing. x8 listens on that socket, speaks
-the same gRPC protocol Xcode's plugin expects, and translates each cache
-lookup or upload into an S3 `GetObject`/`PutObject` call against your bucket.
+A handful of build settings point Xcode's Compilation Cache plugin at a local
+socket. x8 listens on that socket, speaks the gRPC protocol the plugin
+expects, and translates each cache lookup or upload into an S3
+`GetObject`/`PutObject` call against your bucket.
 
 ## Installation
 
@@ -34,9 +48,6 @@ x8 needs Xcode 27 or later (which itself requires macOS 26) and an
 S3-compatible bucket — AWS S3, Cloudflare R2, MinIO, or similar. Xcode 26
 crashes on cached, prefix-mapped builds; see
 [Toolchain support](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#toolchain-support).
-
-Each [GitHub Release](https://github.com/Ryu0118/x8/releases) publishes a
-darwin universal binary archive and a SwiftPM `.artifactbundle`.
 
 ### Nest ([mtj0928/nest](https://github.com/mtj0928/nest))
 
@@ -50,7 +61,20 @@ nest install Ryu0118/x8
 mise use -g github:Ryu0118/x8
 ```
 
-## Setup
+### Other methods
+
+Each [GitHub Release](https://github.com/Ryu0118/x8/releases) publishes a
+darwin universal binary archive and a SwiftPM `.artifactbundle`. To build
+from source instead:
+
+```sh
+git clone https://github.com/Ryu0118/x8.git
+cd x8
+swift build -c release --traits S3
+cp .build/release/x8 /usr/local/bin/x8
+```
+
+## Quick Start
 
 1. Create `.x8.yml` at your project root:
 
@@ -82,7 +106,14 @@ mise use -g github:Ryu0118/x8
    x8 doctor
    ```
 
-4. Build — see [Enabling the remote cache](#enabling-the-remote-cache) below.
+4. Build through the proxy:
+
+   ```sh
+   x8 xcodebuild xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
+   ```
+
+   That is all a command-line or CI build needs. Building from Xcode.app
+   takes a few build settings instead — see the next section.
 
 ## Enabling the remote cache
 
@@ -111,7 +142,7 @@ x8 injects the cache connection and prefix-mapping settings as
 settings. Pass `--no-prefix-mapping` (before the child `xcodebuild`
 argument) if your project sets these portability settings itself. See
 [Prefix mapping](Sources/X8Kit/X8Kit.docc/PrefixMapping.md) for what each
-setting does.
+setting does and which build shapes it cannot make portable.
 
 ### 2. Xcode.app's GUI — ten build settings
 
@@ -184,9 +215,8 @@ machine-specific rather than something every clone of the repo should share.
 cache misses without contacting storage; consumer writes are rejected before
 reaching storage. The role does not change where the cache lives, so a producer
 job and a consumer laptop reading the same `.x8.yml` still share the same cache.
-A single shared `role: both` in `.x8.yml` is
-often enough; split it into `.x8.local.yml` overlays only when specific
-machines need to be restricted:
+A single shared `role: both` in `.x8.yml` is often enough; split it into
+`.x8.local.yml` overlays only when specific machines need to be restricted:
 
 ```yaml
 # .x8.local.yml on a CI runner
@@ -241,10 +271,18 @@ Start with the [custom CLI guide](https://ryu0118.github.io/x8/documentation/x8c
 and the [complete example package](Examples/CustomStorageCLI). Use **X8Kit**
 directly when you want to design a different interface or embed the cache server.
 
-## API reference
+## Documentation
 
 Full API documentation is published at
 [ryu0118.github.io/x8/documentation/x8kit](https://ryu0118.github.io/x8/documentation/x8kit/).
+
+- [Prefix mapping](https://ryu0118.github.io/x8/documentation/x8kit/prefixmapping)
+  explains how build paths are made portable across machines, the toolchain
+  requirement, and the known limitations.
+- [Launchd](https://ryu0118.github.io/x8/documentation/x8kit/launchd) covers
+  running `x8 serve` as a LaunchAgent for Xcode.app builds.
+- [Creating a custom CLI](https://ryu0118.github.io/x8/documentation/x8cli/creatingacustomcli/)
+  walks through building an executable on another storage backend.
 
 ## License
 
