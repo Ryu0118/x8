@@ -1,0 +1,3 @@
+flowchart LR
+    XC["xcodebuild / Xcode.app"] -->|"Compilation Cache protocol\n(gRPC over Unix socket)"| X8["x8 proxy"]
+    X8 -->|"GetObject / PutObject"| S3[("S3 / R2 / any S3-compatible bucket")]

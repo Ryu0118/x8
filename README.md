@@ -18,11 +18,10 @@ of every machine recompiling them.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    XC["xcodebuild / Xcode.app"] -->|"Compilation Cache protocol\n(gRPC over Unix socket)"| X8["x8 proxy"]
-    X8 -->|"GetObject / PutObject"| S3[("S3 / R2 / any S3-compatible bucket")]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="Diagrams/how-it-works~dark.svg">
+  <img alt="xcodebuild or Xcode.app talks the Compilation Cache protocol over a Unix socket to the x8 proxy, which issues GetObject and PutObject calls against an S3-compatible bucket" src="Diagrams/how-it-works.svg">
+</picture>
 
 Xcode's Compilation Cache plugin is told (via a handful of build settings) to
 talk to a local socket instead of nothing. x8 listens on that socket, speaks

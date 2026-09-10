@@ -1,5 +1,5 @@
 #!/bin/bash
-# Renders Mermaid diagram sources into DocC catalog resources.
+# Renders Mermaid diagram sources into DocC catalog resources and README assets.
 #
 # DocC does not render ```mermaid fenced code blocks, so diagram sources live
 # as .mmd files under <catalog>.docc/Diagrams/ and are pre-rendered here into
@@ -9,7 +9,11 @@
 # Resources/<name>~dark.svg (dark). Articles reference the image by base name:
 #   ![alt text](<name>)
 #
-# Rendered SVGs are gitignored; run this script before building docs locally.
+# Rendered DocC SVGs are gitignored; run this script before building docs
+# locally. The top-level Diagrams/ directory holds README diagrams, rendered
+# in place with the same convention. Those SVGs are committed because nothing
+# renders them for GitHub's README view; re-run this script after editing a
+# README .mmd source and commit the result.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -45,19 +49,28 @@ stamp_intrinsic_size() {
   perl -i -pe "s/width=\"100%\"/width=\"${width}\" height=\"${height}\"/ if !\$done++" "$svg"
 }
 
-for diagrams_dir in "$ROOT"/Sources/*/*.docc/Diagrams; do
-  [ -d "$diagrams_dir" ] || continue
-  resources_dir="$(dirname "$diagrams_dir")/Resources"
-  mkdir -p "$resources_dir"
+render_diagrams() {
+  local diagrams_dir="$1" output_dir="$2"
+  local src name
+  mkdir -p "$output_dir"
   for src in "$diagrams_dir"/*.mmd; do
     [ -f "$src" ] || continue
     name="$(basename "$src" .mmd)"
     echo "Rendering $src"
-    "${MMDC[@]}" -i "$src" -o "$resources_dir/$name.svg" \
+    "${MMDC[@]}" -i "$src" -o "$output_dir/$name.svg" \
       -c "$MERMAID_CONFIG" -p "$PUPPETEER_CONFIG" -t neutral -b white
-    "${MMDC[@]}" -i "$src" -o "$resources_dir/$name~dark.svg" \
+    "${MMDC[@]}" -i "$src" -o "$output_dir/$name~dark.svg" \
       -c "$MERMAID_CONFIG" -p "$PUPPETEER_CONFIG" -t dark -b transparent
-    stamp_intrinsic_size "$resources_dir/$name.svg"
-    stamp_intrinsic_size "$resources_dir/$name~dark.svg"
+    stamp_intrinsic_size "$output_dir/$name.svg"
+    stamp_intrinsic_size "$output_dir/$name~dark.svg"
   done
+}
+
+for diagrams_dir in "$ROOT"/Sources/*/*.docc/Diagrams; do
+  [ -d "$diagrams_dir" ] || continue
+  render_diagrams "$diagrams_dir" "$(dirname "$diagrams_dir")/Resources"
 done
+
+if [ -d "$ROOT/Diagrams" ]; then
+  render_diagrams "$ROOT/Diagrams" "$ROOT/Diagrams"
+fi
