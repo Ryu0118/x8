@@ -1,12 +1,18 @@
 # Prefix mapping and cache portability
 
-An unchanged source file can miss the cache when its checkout or build path
-changes. Xcode keys a compiler job, including its arguments and other inputs,
-not just the source bytes. A Swift target that loads a macro also needs a
-content-sensitive identity for its generated macro executable. X8 supplies a
-client-side logical mapping for the compiler working directory, but
-cross-worktree and cross-machine Swift compilation reuse still depends on the
-toolchain and generated inputs.
+Prefix mapping replaces the physical checkout, DerivedData, and product
+paths in a compiler job with stable logical prefixes before Xcode computes
+the job's cache key, so the same source compiled in two checkouts can share
+one cache entry. X8 emits the six Swift and Clang prefix-mapping settings and
+an empty module-validation session path alongside the three connection
+settings; `x8 xcodebuild` injects them, and `x8 serve --print-cache-settings`
+prints them for Xcode.app.
+
+Xcode keys a compiler job on its arguments and other inputs, not just the
+source bytes, so mapping the working directory is necessary but not
+sufficient: cross-worktree reuse still depends on the toolchain and on
+generated inputs such as macro plugin executables (see the known limitations
+below).
 
 ## Logical paths, not shared physical directories
 
@@ -54,8 +60,8 @@ The wrapper omits the six prefix settings and the session-file override when
 settings remain enabled. `serve --print-cache-settings` prints a literal
 mapping for the current directory, or for the directory passed to
 `--workspace-directory`, so the same command can configure Xcode.app on each
-machine. Inspect actual compiler commands to verify which mappings the
-selected toolchain uses.
+machine. When a target misses unexpectedly, the frontend command lines in the
+build log show which mappings the toolchain applied to that job.
 
 The mapping value is space-separated with no quoting or escaping, so a
 working directory containing a space cannot be represented in it. X8 rejects
@@ -119,18 +125,14 @@ frontend behavior for work Xcode has already keyed.
 
 ## Toolchain support
 
-X8's compilation-cache integration targets **Xcode 27 or later**. Xcode 26 is
-unsupported; the CLI does not currently enforce this version policy. This is
-separate from X8's Swift 6.1 package-tools version.
-
-The cached, prefix-mapped batch-diagnostics fix was merged into Swift's
-`main` branch in [PR #90698](https://github.com/swiftlang/swift/pull/90698)
-and into `release/6.4.x` in
-[PR #90700](https://github.com/swiftlang/swift/pull/90700). It registers
-source buffers using the original file path so diagnostic consumers can find
-them. This is a Swift compiler fix, not an X8 or LLVM CAS storage fix. The
-release-branch merge does not identify the first Apple toolchain build
-containing it.
+Requires Xcode 27 or later; x8 does not check the Xcode version at runtime.
+Xcode 26 crashes on cached, prefix-mapped batch diagnostics because the
+compiler registered source buffers under the mapped path, where diagnostic
+consumers could not find them. The Swift 6.4 fix
+([swiftlang/swift#90700](https://github.com/swiftlang/swift/pull/90700))
+registers them under the original path and ships in Xcode 27. The Swift 6.1
+tools version in `Package.swift` describes building X8 itself, not the
+supported Xcode client.
 
 ## Why the proxy cannot simply rewrite a key
 
