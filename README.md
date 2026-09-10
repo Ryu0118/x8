@@ -9,12 +9,12 @@
 
 **[Full API documentation →](https://ryu0118.github.io/x8/documentation/x8kit/)**
 
-Xcode's built-in Compilation Cache only caches locally — every machine still
-compiles from scratch. x8 gives Xcode a *remote* compilation cache: it speaks
-Xcode's cache protocol over a local Unix domain socket and stores the objects
-in AWS S3, Cloudflare R2, or any other S3-compatible bucket, so a team or CI
-can share compiled Swift/Clang module outputs instead of every machine
-recompiling them.
+Xcode already caches compiled Swift/Clang modules, but that cache lives on
+each machine: a module built on one Mac is built again on every other Mac and
+CI runner. x8 lets a team share one cache instead. It speaks Xcode's cache
+protocol over a local Unix domain socket and stores the cached objects in AWS
+S3, Cloudflare R2, or any other S3-compatible bucket, so whatever one machine
+compiles, every other machine can download instead of rebuilding.
 
 ## Table of Contents
 
@@ -45,9 +45,11 @@ expects, and translates each cache lookup or upload into an S3
 ## Installation
 
 x8 needs Xcode 27 or later (which itself requires macOS 26) and an
-S3-compatible bucket — AWS S3, Cloudflare R2, MinIO, or similar. Xcode 26
-crashes on cached, prefix-mapped builds; see
-[Toolchain support](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#toolchain-support).
+S3-compatible bucket — AWS S3, Cloudflare R2, MinIO, or similar. That is all
+you need to get started. Xcode 26 is unsupported because it crashes on cached,
+prefix-mapped builds; the
+[Toolchain support](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#toolchain-support)
+note has the details if you are curious, but you don't need to read it now.
 
 ### Nest ([mtj0928/nest](https://github.com/mtj0928/nest))
 
@@ -149,7 +151,11 @@ setting does and which build shapes it cannot make portable.
 Xcode's GUI builds can't be wrapped, so they need the settings Xcode's
 Compilation Cache plugin looks for, added directly to your target (or an
 `.xcconfig`) as **user-defined build settings** (they aren't exposed in
-Xcode's Build Settings UI, so add them by name):
+Xcode's Build Settings UI, so add them by name). Together they tell Xcode to
+send cache traffic to x8's socket and to record build paths as portable
+`/^…` placeholders instead of machine-specific absolute paths, so cache
+entries match across machines. Copy the values exactly; you don't need to
+understand prefix mapping to use them:
 
 | Build Setting | Value |
 | --- | --- |
