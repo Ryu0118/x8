@@ -1,0 +1,87 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'Examples/**'
+      - 'scripts/check-custom-cli.sh'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - '.swiftformat'
+      - '.swift-ast-lint.yml'
+      - '.swiftlint.yml'
+      - '.mise.toml'
+      - '.github/workflows/test.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'Examples/**'
+      - 'scripts/check-custom-cli.sh'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - '.swiftformat'
+      - '.swift-ast-lint.yml'
+      - '.swiftlint.yml'
+      - '.mise.toml'
+      - '.github/workflows/test.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: macos-26
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install mise
+        uses: jdx/mise-action@v3
+
+      - name: SwiftFormat
+        run: mise exec -- swiftformat --lint .
+
+      - name: SwiftLint
+        run: mise exec -- swiftlint lint --config .swiftlint.yml --strict
+
+      - name: my-swift-linter
+        run: mise exec -- my-swift-linter lint
+
+  build-and-test:
+    name: Build and Test (S3=${{ matrix.s3 }})
+    needs: lint
+    runs-on: macos-26
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - s3: false
+            traits: ''
+          - s3: true
+            traits: '--traits S3'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build ${{ matrix.traits }}
+
+      - name: Test
+        run: swift test ${{ matrix.traits }}
+
+      - name: Verify independent CLI consumer
+        if: matrix.s3 == false
+        run: sh scripts/check-custom-cli.sh

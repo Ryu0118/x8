@@ -1,0 +1,76 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Sources/**/*.docc/**'
+      - 'Sources/**/*.swift'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - '.github/workflows/docs.yml'
+      - 'scripts/render-diagrams.sh'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build DocC
+    runs-on: macos-26
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Render Mermaid diagrams
+        run: ./scripts/render-diagrams.sh
+
+      - name: Build documentation
+        run: |
+          CLANG_MODULE_CACHE_PATH=.build/module-cache \
+          swift package --disable-sandbox \
+            --cache-path .build/swiftpm-cache \
+            --config-path .build/swiftpm-config \
+            --security-path .build/swiftpm-security \
+            --traits S3 \
+            generate-documentation \
+            --target X8CLI \
+            --target X8Kit \
+            --target X8Storage \
+            --target X8Core \
+            --target X8Config \
+            --target X8S3 \
+            --enable-experimental-combined-documentation \
+            --disable-indexing \
+            --transform-for-static-hosting \
+            --hosting-base-path "/${REPOSITORY_NAME}" \
+            --output-path .build/docs
+        env:
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: .build/docs
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

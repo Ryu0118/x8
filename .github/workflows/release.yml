@@ -1,0 +1,156 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.2.0)'
+        required: true
+        type: string
+
+# Default read-only; only the jobs that push a commit or publish a release
+# get contents: write, so a compromised step in preflight/build cannot write.
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate version format
+        run: |
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "error: version must be in semver format (e.g. 0.2.0)" >&2
+            exit 1
+          fi
+        env:
+          VERSION: ${{ inputs.version }}
+
+      - name: Check tag does not already exist
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/$VERSION$"; then
+            echo "error: tag $VERSION already exists" >&2
+            exit 1
+          fi
+        env:
+          VERSION: ${{ inputs.version }}
+
+  build-macos:
+    needs: preflight
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Bump Version.swift (build-time only)
+        run: |
+          sed -i '' "s/static let current = \".*\"/static let current = \"$VERSION\"/" \
+            Sources/X8CLI/Version.swift
+        env:
+          VERSION: ${{ inputs.version }}
+
+      - name: Build Universal Binary
+        run: swift build -c release --traits S3 --arch arm64 --arch x86_64
+
+      - name: Create Archive
+        run: |
+          cd .build/apple/Products/Release
+          tar -czvf "x8-${VERSION}-darwin-universal.tar.gz" x8
+          shasum -a 256 "x8-${VERSION}-darwin-universal.tar.gz" > "x8-${VERSION}-darwin-universal.tar.gz.sha256"
+        env:
+          VERSION: ${{ inputs.version }}
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@v6
+        with:
+          name: x8-darwin-universal
+          path: |
+            .build/apple/Products/Release/x8-${{ inputs.version }}-darwin-universal.tar.gz
+            .build/apple/Products/Release/x8-${{ inputs.version }}-darwin-universal.tar.gz.sha256
+          if-no-files-found: error
+
+      - uses: giginet/github-action-artifactbundle@97117bc42b44f33e0d04b543b815ad9f3079f25e # v2
+        id: artifactbundle
+        with:
+          artifact_name: x8
+          version: ${{ inputs.version }}
+
+      - name: Upload artifact bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: x8-artifactbundle
+          path: |
+            ${{ steps.artifactbundle.outputs.bundle_path }}
+          if-no-files-found: error
+
+  # Version bump + push only after the build succeeds.
+  commit-version:
+    needs: build-macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      commit_sha: ${{ steps.push.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Bump version file
+        run: |
+          sed -i "s/static let current = \".*\"/static let current = \"$VERSION\"/" \
+            Sources/X8CLI/Version.swift
+        env:
+          VERSION: ${{ inputs.version }}
+
+      - name: Commit and push
+        id: push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Sources/X8CLI/Version.swift
+          if git diff --cached --quiet; then
+            echo "Version file already at $VERSION, skipping commit"
+          else
+            git commit -m "chore: bump version to $VERSION"
+            git push origin main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION: ${{ inputs.version }}
+
+  create-release:
+    needs: [commit-version, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.commit-version.outputs.commit_sha }}
+
+      - name: Download release archive
+        uses: actions/download-artifact@v6
+        with:
+          name: x8-darwin-universal
+          path: /tmp/release-assets
+
+      - name: Download artifact bundle
+        uses: actions/download-artifact@v6
+        with:
+          name: x8-artifactbundle
+          path: /tmp/release-assets
+
+      - name: Create GitHub Release with all assets
+        # GitHub context values are passed via env and never spliced into the
+        # shell command text. tag_name / version inputs are treated as data so
+        # ``$(...)``/backticks cannot execute in this contents:write job.
+        run: |
+          gh release create "$VERSION" \
+            /tmp/release-assets/* \
+            --target "$TARGET_SHA" \
+            --title "$VERSION" \
+            --generate-notes
+        env:
+          VERSION: ${{ inputs.version }}
+          TARGET_SHA: ${{ needs.commit-version.outputs.commit_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
