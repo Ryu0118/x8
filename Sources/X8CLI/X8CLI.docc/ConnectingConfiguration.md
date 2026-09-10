@@ -37,8 +37,7 @@ The identifier becomes a local directory component and must contain 1–64 ASCII
 letters, digits, underscores, or hyphens. Configuration construction rejects
 path separators, traversal components, whitespace, and other characters. A
 short digest of a canonical domain representation is suitable; the example
-prefixes its digest with `memory-`. The official S3 executable retains its
-existing profile ID derivation and runtime paths.
+prefixes its digest with `memory-`.
 
 ## Command behavior
 

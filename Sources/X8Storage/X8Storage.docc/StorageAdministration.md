@@ -14,7 +14,7 @@ hours. `CachePurgeExecutor` re-lists the scope immediately before calling it
 and only passes objects whose revision still matched that fresh listing —
 but the batch request itself is not necessarily atomic per key at the
 provider. AWS S3's `DeleteObjects` accepts and enforces a per-object ETag
-precondition; Cloudflare R2's `DeleteObjects` is confirmed to ignore it and
+precondition; Cloudflare R2's `DeleteObjects` ignores it and
 delete unconditionally regardless of which revision was sent. The remaining
 race window is therefore the time between that fresh listing and the batch
 request landing at the provider, not the whole plan-to-confirm window: a key

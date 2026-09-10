@@ -1,5 +1,7 @@
 # Cache Model
 
+How Action Cache keys, result metadata, and CAS identifiers relate.
+
 ## Overview
 
 The Xcode compilation cache has two related but distinct parts: an Action

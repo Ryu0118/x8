@@ -1,5 +1,7 @@
 # Configuration flow
 
+How `.x8.yml` is located, resolved, and handed to the S3 executable.
+
 ## Overview
 
 X8 configuration is resolved in three deliberately separate stages:

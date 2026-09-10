@@ -73,6 +73,6 @@ invocations inside a host process, use `await cli.run(arguments: [...])`; it
 returns an `Int32` status without calling `exit`. The command tree, including
 the `x8` name in usage text, is shared with the official executable.
 
-X8CLI has no S3 or YAML compilation dependency. SwiftPM may still fetch packages
-that belong to other products; use its dependency-pruning mode when checking
-downloads separately from the target dependency graph.
+X8CLI has no S3 or YAML compilation dependency. SwiftPM may still fetch
+packages that belong to other products; the example README describes how to
+check downloads separately from the target dependency graph.
