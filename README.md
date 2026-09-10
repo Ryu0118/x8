@@ -34,13 +34,14 @@ compiles, every other machine can download instead of rebuilding.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="Diagrams/how-it-works~dark.svg">
-  <img alt="xcodebuild or Xcode.app talks the Compilation Cache protocol over a Unix socket to the x8 proxy, which issues GetObject and PutObject calls against an S3-compatible bucket" src="Diagrams/how-it-works.svg">
+  <img alt="xcodebuild or Xcode.app talks the Compilation Cache protocol over a Unix socket to the x8 proxy, which reads and writes objects in an S3-compatible bucket" src="Diagrams/how-it-works.svg">
 </picture>
 
 A handful of build settings point Xcode's Compilation Cache plugin at a local
 socket. x8 listens on that socket, speaks the gRPC protocol the plugin
-expects, and translates each cache lookup or upload into an S3
-`GetObject`/`PutObject` call against your bucket.
+expects, and translates each cache lookup or upload into a read or write of
+one object in your bucket (an S3 `GetObject` or `PutObject` request, which is
+why any S3-compatible provider works).
 
 ## Installation
 
@@ -115,7 +116,8 @@ cp .build/release/x8 /usr/local/bin/x8
    ```
 
    That is all a command-line or CI build needs. Building from Xcode.app
-   takes a few build settings instead — see the next section.
+   instead uses a long-running `x8 serve` plus a few build settings — see
+   [Xcode.app's GUI](#2-xcodeapps-gui--ten-build-settings) below.
 
 ## Enabling the remote cache
 
@@ -205,7 +207,7 @@ lifecycle.
 | `bucket` | yes | The S3 bucket name. |
 | `region` | no | AWS region or provider-specific signing region. Defaults to `us-east-1`. |
 | `endpoint` | no | Custom endpoint for an S3-compatible provider (e.g. R2). Omit for AWS S3. |
-| `role` | no | `producer`, `consumer`, or `both`. Defaults to `both`. |
+| `role` | no | `producer`, `consumer`, or `both`. Defaults to `both`. CI runners that populate the cache are typically `producer`; developer machines that only pull from it are typically `consumer`. |
 | `accessKeyID` | no | Static access key ID. Omit to use the standard AWS credential provider chain. |
 | `secretAccessKey` | no | Static secret access key, paired with `accessKeyID`. Never commit a literal value — use `$VAR` expansion. |
 | `sessionToken` | no | Optional session token for temporary/STS credentials, paired with `accessKeyID`/`secretAccessKey`. |
@@ -284,11 +286,14 @@ Full API documentation is published at
 
 - [Prefix mapping](https://ryu0118.github.io/x8/documentation/x8kit/prefixmapping)
   explains how build paths are made portable across machines, the toolchain
-  requirement, and the known limitations.
+  requirement, and the known limitations. Read it when cache hits are lower
+  than expected or a build shape doesn't seem to cache.
 - [Launchd](https://ryu0118.github.io/x8/documentation/x8kit/launchd) covers
-  running `x8 serve` as a LaunchAgent for Xcode.app builds.
+  running `x8 serve` as a LaunchAgent for Xcode.app builds. Read it if you
+  build from Xcode.app rather than `x8 xcodebuild`.
 - [Creating a custom CLI](https://ryu0118.github.io/x8/documentation/x8cli/creatingacustomcli/)
-  walks through building an executable on another storage backend.
+  walks through building an executable on another storage backend. Read it
+  only if you need a non-S3 backend.
 
 ## License
 
