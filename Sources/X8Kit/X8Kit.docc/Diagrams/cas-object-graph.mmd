@@ -1,0 +1,19 @@
+flowchart TB
+    AK["Action Cache key<br/>(digest of inputs, flags, toolchain)"]
+    AV["Action Cache value<br/>entries.value points at root CAS ID"]
+    ROOT["CASObject: compilation result<br/>blob: result metadata<br/>references below"]
+    OBJ_O["CASObject: object code (.o)"]
+    DIAG["CASObject: diagnostics"]
+    DEPS["CASObject: dependency record"]
+    PCM["CASObject: precompiled module<br/>(shared by many results)"]
+    LEAF1["CASBlob: raw bytes"]
+    LEAF2["CASBlob: raw bytes"]
+
+    AK -- "GetValue" --> AV
+    AV -- "Get(root)" --> ROOT
+    ROOT --> OBJ_O
+    ROOT --> DIAG
+    ROOT --> DEPS
+    ROOT --> PCM
+    OBJ_O --> LEAF1
+    PCM --> LEAF2

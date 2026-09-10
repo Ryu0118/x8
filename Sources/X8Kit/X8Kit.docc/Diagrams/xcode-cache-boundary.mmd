@@ -1,0 +1,21 @@
+flowchart LR
+    Xcode["Xcode / xcodebuild"]
+    Socket["Unix-domain socket\ngRPC endpoint"]
+
+    subgraph Adapter["Protocol adapter"]
+        AC["Action Cache\nKeyValueDB"]
+        CAS["CAS\nCASDBService"]
+    end
+
+    subgraph Storage["Storage boundary"]
+        ACStore["ActionCacheStore"]
+        CASStore["CASStore"]
+    end
+
+    Xcode --> Socket
+    Socket --> AC
+    Socket --> CAS
+    AC --> ACStore
+    CAS --> CASStore
+    ACStore --> Backend["Storage backend\n(e.g. X8S3)"]
+    CASStore --> Backend

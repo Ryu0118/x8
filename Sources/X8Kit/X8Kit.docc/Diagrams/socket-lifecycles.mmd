@@ -1,0 +1,13 @@
+flowchart LR
+    subgraph A["x8 xcodebuild (invocation-scoped)"]
+        direction LR
+        A1["XcodeCacheSession.start"] --> A2["private socket under /private/tmp/x8/x8-cache-uuid/"]
+        A2 --> A3["xcodebuild with COMPILATION_CACHE_* and *_PREFIX_MAPPING overrides"]
+        A3 --> A4["xcodebuild exits: session.shutdown, socket and directory removed"]
+    end
+    subgraph B["x8 serve (long-lived)"]
+        direction LR
+        B1["XcodeServeRunner.start<br/>or startActivated via launchd"] --> B2["stable socket<br/>Application Support/X8/profileID/listener.sock"]
+        B2 --> B3["any number of xcodebuild / Xcode GUI builds<br/>configured with the printed settings"]
+        B3 --> B4["SIGINT / SIGTERM or handle.shutdown"]
+    end

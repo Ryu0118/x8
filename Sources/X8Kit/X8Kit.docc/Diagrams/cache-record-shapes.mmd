@@ -1,0 +1,20 @@
+flowchart LR
+    subgraph AC["Action Cache — KeyValueDB"]
+        direction TB
+        ACK["key: bytes<br/>(opaque action digest)"]
+        ACV["Value entries: map string to bytes<br/>small result record"]
+        ACK -- "GetValue / PutValue" --> ACV
+        ACO["GetValue outcome:<br/>SUCCESS / KEY_NOT_FOUND / ERROR"]
+    end
+
+    subgraph CAS["CAS — CASDBService"]
+        direction TB
+        ID["CASDataID id: bytes<br/>(opaque)"]
+        OBJ["CASObject<br/>blob + repeated references"]
+        BLOB["CASBlob<br/>blob only, no references"]
+        ID -- "Get / Put" --> OBJ
+        ID -- "Load / Save" --> BLOB
+        CO["Get/Load outcome:<br/>SUCCESS / OBJECT_NOT_FOUND / ERROR"]
+    end
+
+    ACV -. "entries carry CAS IDs" .-> ID

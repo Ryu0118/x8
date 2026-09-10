@@ -1,0 +1,22 @@
+stateDiagram-v2
+    [*] --> PreparingDirectory: runner selects socket path
+    PreparingDirectory --> Serving: server factory starts serve() task
+    Serving --> WaitingForSocket
+    WaitingForSocket --> WaitingForSocket: poll for the socket path
+    WaitingForSocket --> ProtectingSocket: socket path exists
+    WaitingForSocket --> StartupFailed: task exited early
+    WaitingForSocket --> StartupFailed: startup deadline elapsed
+    WaitingForSocket --> StartupFailed: cancelled or filesystem error
+    ProtectingSocket --> Ready: restrictive permissions applied, task ownership to session
+    ProtectingSocket --> StartupFailed: permission change fails
+    StartupFailed --> Drained: graceful stop requested; serving task awaited
+    Drained --> [*]: socket removed; original error rethrown
+    Ready --> Draining: shutdown() or termination signal
+    Ready --> Draining: transport failure (wait() rethrows after cleanup)
+    Draining --> [*]: response files removed; socket removed unless launchd owns it
+
+    note right of WaitingForSocket
+        A launchd-activated start skips this state:
+        the descriptor is already bound, and the
+        session never owns the socket node.
+    end note
