@@ -85,8 +85,10 @@ cp .build/release/x8 /usr/local/bin/x8
    version: 1
    bucket: my-team-cache
    # endpoint is optional for AWS S3 — omit it entirely and x8 uses AWS's
-   # default endpoint. Set it only for an S3-compatible provider (R2, etc.):
-   endpoint: https://<account-id>.r2.cloudflarestorage.com
+   # default endpoint. Set it only for an S3-compatible provider. For R2,
+   # replace abc123 with your Cloudflare account ID (shown in the R2
+   # dashboard next to the bucket's S3 API URL):
+   endpoint: https://abc123.r2.cloudflarestorage.com
    ```
 
 2. Provide credentials. Every field in `.x8.yml` supports POSIX-style
@@ -115,8 +117,12 @@ cp .build/release/x8 /usr/local/bin/x8
    x8 xcodebuild xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
    ```
 
-   That is all a command-line or CI build needs. Building from Xcode.app
-   instead uses a long-running `x8 serve` plus a few build settings — see
+   If the build succeeds, x8 is proxying the cache: this first build
+   uploads each compiled module to your bucket, and a later build of the same
+   unchanged modules on another machine (or on this one after clearing
+   DerivedData) downloads them instead of running the compiler. That is all a
+   command-line or CI build needs. Building from Xcode.app instead uses a
+   long-running `x8 serve` plus a few build settings — see
    [Xcode.app's GUI](#2-xcodeapps-gui--ten-build-settings) below.
 
 ## Enabling the remote cache
@@ -139,6 +145,11 @@ The first `xcodebuild` selects x8's subcommand; the second selects the child
 executable. The child can also be an absolute path ending in `xcodebuild`.
 x8 preserves the caller's build arguments and chosen directories.
 
+x8 also makes the build portable across machines through *prefix mapping*:
+compiled output normally embeds absolute paths such as
+`/Users/you/src/MyApp`, which differ on every machine and would prevent a
+module built on your Mac from being a cache hit on CI. Prefix mapping replaces
+those paths with stable placeholders before they reach the cache. Concretely,
 x8 injects the cache connection and prefix-mapping settings as
 `SETTING=VALUE` overrides, mapping the working directory to the shared
 `/^workspace` logical prefix. It does not inject or replace
@@ -201,30 +212,32 @@ lifecycle.
 
 ## Configuration
 
+x8 reads `.x8.yml` from the project root; it is the file every machine shares,
+so commit it. An optional, git-ignored `.x8.local.yml` next to it overlays
+values for whichever machine it lives on: use it only when a value is
+genuinely machine-specific rather than something every clone of the repo
+should share. Every key below can appear in either file, and every value
+supports `$VAR` expansion.
+
 | Key | Required | Description |
 | --- | --- | --- |
 | `version` | yes | Config schema version. Currently `1`. |
 | `bucket` | yes | The S3 bucket name. |
 | `region` | no | AWS region or provider-specific signing region. Defaults to `us-east-1`. |
 | `endpoint` | no | Custom endpoint for an S3-compatible provider (e.g. R2). Omit for AWS S3. |
-| `role` | no | `producer`, `consumer`, or `both`. Defaults to `both`. CI runners that populate the cache are typically `producer`; developer machines that only pull from it are typically `consumer`. |
+| `role` | no | What this machine may do with the cache: `producer` (write only — uploads, never downloads), `consumer` (read only — downloads, never uploads), or `both` (read and write). Defaults to `both`. |
 | `accessKeyID` | no | Static access key ID. Omit to use the standard AWS credential provider chain. |
 | `secretAccessKey` | no | Static secret access key, paired with `accessKeyID`. Never commit a literal value — use `$VAR` expansion. |
 | `sessionToken` | no | Optional session token for temporary/STS credentials, paired with `accessKeyID`/`secretAccessKey`. |
 
-Every key in this table can be set in `.x8.yml` — including `role` and, via
-`$VAR` expansion, credentials — since it's the file every machine reads. An
-optional, git-ignored `.x8.local.yml` next to it overlays values for
-whichever machine it lives on: use it when a value is genuinely
-machine-specific rather than something every clone of the repo should share.
-
-`role` gates reads and writes at the storage boundary: `producer` writes only,
-`consumer` reads only, and `both` permits both operations. Producer reads return
-cache misses without contacting storage; consumer writes are rejected before
+`role` is enforced at the storage boundary: a producer's reads return cache
+misses without contacting storage, and a consumer's writes are rejected before
 reaching storage. The role does not change where the cache lives, so a producer
 job and a consumer laptop reading the same `.x8.yml` still share the same cache.
-A single shared `role: both` in `.x8.yml` is often enough; split it into
-`.x8.local.yml` overlays only when specific machines need to be restricted:
+A single shared `role: both` in `.x8.yml` is often enough. Split it into
+`.x8.local.yml` overlays only when specific machines need to be restricted —
+typically CI runners that populate the cache as `producer` and developer
+machines that only pull from it as `consumer`:
 
 ```yaml
 # .x8.local.yml on a CI runner
