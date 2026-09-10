@@ -28,14 +28,6 @@ talk to a local socket instead of nothing. x8 listens on that socket, speaks
 the same gRPC protocol Xcode's plugin expects, and translates each cache
 lookup or upload into an S3 `GetObject`/`PutObject` call against your bucket.
 
-## Known limitations
-
-- **Macro plugins:** a target that loads a Swift macro can miss the cache
-  across worktrees because the generated plugin executable embeds a
-  build-output path; see [the macro-plugin limitation](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#known-limitation-generated-macro-plugin-executables).
-- **Package trait ordering:** a change in the order of trait-derived `-D`
-  flags alone changes a compile key; see [package trait ordering](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#known-limitation-package-trait-ordering).
-
 ## Installation
 
 x8 needs Xcode 27 or later (which itself requires macOS 26) and an
