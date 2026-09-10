@@ -12,8 +12,8 @@ socket node — launchd recreates it after a service restart, login, or
 reboot. Cache records live in the configured storage backend, not the
 socket, so none of that churn affects them.
 
-The LaunchAgent's `WorkingDirectory` must contain `.x8.yml` because
-`X8ConfigurationLoader` intentionally checks only the current directory.
+The LaunchAgent's `WorkingDirectory` must contain `.x8.yml`: x8 reads the
+configuration from the working directory only and does not search parents.
 
 ## There is no `x8 stop`
 
@@ -48,7 +48,7 @@ Copy the template below to `~/Library/LaunchAgents/<Label>.plist` and replace:
     <!-- Absolute path to the x8 binary. `which x8` in a terminal; launchd has no shell PATH. -->
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/homebrew/bin/x8</string>
+        <string>/path/to/x8</string>
         <string>serve</string>
         <string>--launchd</string>
     </array>
@@ -175,12 +175,10 @@ DerivedData paths. It intentionally does not require a fixed workspace,
 package, or DerivedData layout, because that would not be portable to another
 checkout or machine.
 
-On Xcode 27+, the project prefix settings normalize the ordinary source,
-DerivedData, and product roots. They do not make generated macro plugin
-executables identical between worktrees, so macro-heavy targets can still miss
-the cache across worktrees for that reason. See <doc:PrefixMapping> for this
-limitation; a long-lived `serve` process must not be described as solving
-that toolchain limitation.
+Prefix mapping normalizes source, DerivedData, and product roots; it does
+not make generated macro plugin executables identical between worktrees, so
+macro-heavy targets can still miss across worktrees. See <doc:PrefixMapping>
+for that limitation.
 
 `x8 serve --print-cache-settings` prints the same ten lines for whichever
 socket the running instance serves; it is a convenience for foreground use,
@@ -200,7 +198,7 @@ not a substitute for setting the same socket path in Xcode.
 | Xcode: connection refused, socket file exists | Orphaned node from an old `SockPathName` or from a foreground `x8 serve` that was killed with `SIGKILL`; launchd is not listening on it | Confirm with `print` that the loaded service's `Listener` path differs, `rm` the orphan, fix the build setting |
 | Xcode: no such file | Service not loaded (`bootout` removed the node) or path mismatch between plist and xcconfig | `bootstrap`; diff the two paths |
 | Backend auth errors in stderr | Shell-profile environment not present under launchd | Add to `EnvironmentVariables` or `.x8.yml` |
-| Builds succeed but never hit the cache, stderr clean | Prefix mapping off, or the target has path-sensitive inputs not covered by Xcode's mappings (<doc:PrefixMapping>) | Add all six prefix-mapping settings, then check for known limitations in <doc:PrefixMapping>; a fixed build layout is not an X8 requirement or a macro-plugin fix |
+| Builds succeed but never hit the cache, stderr clean | Prefix mapping off, or the target has path-sensitive inputs not covered by Xcode's mappings (<doc:PrefixMapping>) | Add all six prefix-mapping settings, then check the known limitations in <doc:PrefixMapping> |
 | Builds succeed but never hit the cache, backend errors in stderr | Cache misses are fail-open | Fix backend, `kickstart -k` |
 
 Full reset:
