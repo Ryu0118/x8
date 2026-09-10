@@ -19,17 +19,10 @@ design and source documentation belong in the other two rules.
 - Do not modify unrelated user changes or remove artifacts unless their ownership and generated nature are clear.
 - Do not perform destructive Git operations (`checkout`, `reset --hard`, `clean -f`, or broad deletion) without explicit user approval.
 
-When the repository is intentionally a skeleton, validate the package
-manifest/target graph and report that build or test execution is unavailable
-until source files exist.
+## Reporting results
 
-## Investigation decisions
-
-When measurements stop improving, do not continue cycling through changes.
-Separate observed facts, concrete constraints, and unknowns; state the next
-falsifiable hypothesis, its expected effect, and the check that will decide it
-before running another experiment. If the target cannot be reached within the
-allowed changes, say so explicitly with evidence and the conditions needed to
-reach it. Do not present partial improvement as completion. Distinguish stock
-toolchain results from results requiring an experimental service or build
-setting tradeoff. Keep reported measurements current.
+Do not present partial progress as completion. When a task cannot be finished
+within the allowed changes, say so explicitly, separate what was verified from
+what is assumed, and state what would be needed to finish it. Do not keep
+cycling through variations of the same change once it stops making progress;
+state the next hypothesis and the check that will decide it first.

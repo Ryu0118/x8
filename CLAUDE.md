@@ -1,9 +1,12 @@
 # X8
 
-Swift Package for an S3-compatible remote compilation cache proxy for Xcode.
-The Xcode protobuf schema and generated gRPC boundary are now checked in.
-Storage, S3 integration, the protocol adapter, Kit runners, and the CLI are
-implemented incrementally.
+Swift package for `x8`, an S3-compatible remote compilation cache proxy for
+Xcode. It serves Xcode's compilation-cache gRPC protocol over a Unix-domain
+socket and stores CAS objects and Action Cache values in an S3-compatible
+bucket. The package is split into a domain layer (`X8Core`), a storage
+boundary (`X8Storage`), the S3 adapter (`X8S3`), reusable cache use cases
+(`X8Kit`), YAML configuration (`X8Config`), the shared command tree (`X8CLI`),
+and the official executable (`x8`).
 
 ## Commands
 
