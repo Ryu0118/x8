@@ -43,7 +43,12 @@ struct X8CLICommandTests {
         #expect(!second.events.joined().contains("first"))
     }
 
-    @Test(arguments: [["serve", "--print-socket", "--print-cache-settings"], ["cache", "purge", "--scope", "wrong"]])
+    @Test(arguments: [
+        ["serve", "--print-socket", "--print-cache-settings"],
+        ["cache", "purge", "--scope", "wrong"],
+        ["build"],
+        ["xcodebuild", "xcodebuild", "build"],
+    ])
     func rejectsInvalidArgumentsBeforeLoading(arguments: [String]) async {
         let recorder = CLIRecorder()
         #expect(await makeCLI(recorder: recorder).run(arguments: arguments) == 64)
@@ -54,16 +59,41 @@ struct X8CLICommandTests {
     @Test
     func preservesUndocumentedDiagnosticWithoutAdvertisingIt() throws {
         #expect(try X8RootCommand.parseAsRoot(["stats"]) is StatsCommand)
-        #expect(!X8RootCommand.helpMessage().contains("stats"))
+        let help = X8RootCommand.helpMessage()
+        #expect(!help.contains("stats"))
+        #expect(!help.contains("xcode-build"))
+        #expect(help.contains("<xcodebuild>"))
     }
 
     @Test
     func preservesXcodeArgumentPassthrough() throws {
-        let arguments = ["xcodebuild", "xcodebuild", "-scheme", "App", "--help", "SETTING=a b"]
+        let arguments = ["xcodebuild", "-scheme", "App", "--help", "SETTING=a b"]
         let parsed = try #require(X8RootCommand.parseAsRoot(arguments) as? XcodeBuildCommand)
-        #expect(parsed.arguments == Array(arguments.dropFirst()))
+        #expect(parsed.arguments == arguments)
         let implicit = try #require(X8RootCommand.parseAsRoot(["/Applications/Xcode.app/usr/bin/xcodebuild", "build"]) as? XcodeBuildCommand)
         #expect(implicit.arguments == ["/Applications/Xcode.app/usr/bin/xcodebuild", "build"])
+    }
+
+    @Test
+    func preservesNoPrefixMappingRegardlessOfPosition() throws {
+        let beforeExecutable = try #require(
+            X8RootCommand.parseAsRoot(["--no-prefix-mapping", "xcodebuild", "build"]) as? XcodeBuildCommand
+        )
+        #expect(beforeExecutable.noPrefixMapping)
+        #expect(beforeExecutable.arguments == ["xcodebuild", "build"])
+
+        let afterExecutable = try #require(
+            X8RootCommand.parseAsRoot(["xcodebuild", "--no-prefix-mapping", "build"]) as? XcodeBuildCommand
+        )
+        #expect(!afterExecutable.noPrefixMapping)
+        #expect(afterExecutable.arguments == ["xcodebuild", "--no-prefix-mapping", "build"])
+    }
+
+    @Test
+    func rejectsTheLegacyDoubleXcodebuildForm() async {
+        let recorder = CLIRecorder()
+        #expect(await makeCLI(recorder: recorder).run(arguments: ["xcodebuild", "xcodebuild", "build"]) == 64)
+        #expect(recorder.events.contains { $0.hasPrefix("stderr:") && $0.contains("no longer takes a subcommand name") })
     }
 
     @Test

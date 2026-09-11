@@ -6,9 +6,16 @@ import X8Kit
 import X8Storage
 
 struct XcodeBuildCommand: X8ExecutableCommand {
+    /// Reached only through `X8RootCommand`'s `defaultSubcommand` fallback,
+    /// so a leading `xcodebuild` (or a path ending in it) in `arguments` is
+    /// never consumed as a subcommand selector. The command name must never
+    /// equal `xcodebuild` or that invariant breaks; it is hidden because the
+    /// root's `usage` already documents the invocation shape.
     static let configuration = CommandConfiguration(
-        commandName: "xcodebuild",
-        abstract: "Run xcodebuild through an embedded X8 cache proxy."
+        commandName: "xcode-build",
+        abstract: "Run xcodebuild through an embedded X8 cache proxy.",
+        usage: "x8 [--no-prefix-mapping] <xcodebuild> [<xcodebuild-argument> ...]",
+        shouldDisplay: false
     )
 
     @Flag(
@@ -75,6 +82,12 @@ struct XcodeBuildCommand: X8ExecutableCommand {
         guard first.split(separator: "/").last == "xcodebuild" else {
             throw ValidationError(
                 "The first argument must be 'xcodebuild' or a path ending in 'xcodebuild', got '\(first)'."
+            )
+        }
+        if arguments.count >= 2, arguments[1] == "xcodebuild" {
+            throw ValidationError(
+                "x8 no longer takes a subcommand name before xcodebuild; drop the leading 'xcodebuild' "
+                    + "(e.g. 'x8 xcodebuild -workspace ... build')."
             )
         }
         return first == "xcodebuild" ? .name(first) : .path(FilePath(first))
