@@ -114,7 +114,7 @@ cp .build/release/x8 /usr/local/bin/x8
 4. Build through the proxy:
 
    ```sh
-   x8 xcodebuild xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
+   x8 xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
    ```
 
    If the build succeeds, x8 is proxying the cache: this first build
@@ -138,12 +138,13 @@ Wraps a normal `xcodebuild` invocation with an embedded, invocation-scoped
 proxy. No `.xcconfig` or `project.pbxproj` edits required:
 
 ```sh
-x8 xcodebuild xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
+x8 xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
 ```
 
-The first `xcodebuild` selects x8's subcommand; the second selects the child
-executable. The child can also be an absolute path ending in `xcodebuild`.
-x8 preserves the caller's build arguments and chosen directories.
+Pass `xcodebuild`, or an absolute path ending in `xcodebuild` (for a specific
+Xcode.app), as the first argument; everything after it is forwarded to that
+executable unchanged. x8 preserves the caller's build arguments and chosen
+directories.
 
 x8 also makes the build portable across machines through *prefix mapping*:
 compiled output normally embeds absolute paths such as
