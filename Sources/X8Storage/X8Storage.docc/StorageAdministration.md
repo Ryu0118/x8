@@ -6,7 +6,7 @@ when their observed ``StorageRevision`` still matches at the moment of
 deletion. A changed or missing revision is reported as a skipped deletion,
 so a purge cannot remove a newer replacement discovered after planning.
 
-## Batch deletion and its race window
+## Batch deletion race window
 
 `CacheAdministration.delete(_ objects:)` deletes many objects in one call so
 a purge of tens of thousands of objects finishes in seconds rather than

@@ -22,8 +22,8 @@ compiles, every other machine can download instead of rebuilding.
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Enabling the remote cache](#enabling-the-remote-cache)
-  - [`xcodebuild` / CI](#1-xcodebuild--ci--x8-xcodebuild)
-  - [Xcode.app's GUI](#2-xcodeapps-gui--ten-build-settings)
+  - [`xcodebuild` and CI builds](#1-xcodebuild-and-ci-builds)
+  - [Xcode.app GUI builds](#2-xcodeapp-gui-builds)
 - [Configuration](#configuration)
 - [Commands](#commands)
 - [Using another storage implementation](#using-another-storage-implementation)
@@ -123,7 +123,7 @@ cp .build/release/x8 /usr/local/bin/x8
    DerivedData) downloads them instead of running the compiler. That is all a
    command-line or CI build needs. Building from Xcode.app instead uses a
    long-running `x8 serve` plus a few build settings — see
-   [Xcode.app's GUI](#2-xcodeapps-gui--ten-build-settings) below.
+   [Xcode.app GUI builds](#2-xcodeapp-gui-builds) below.
 
 ## Enabling the remote cache
 
@@ -132,7 +132,7 @@ For command-line builds, `x8 xcodebuild` supplies the cache connection and
 prefix-mapping settings without changing build paths. For Xcode.app builds,
 configure the printed cache settings in the project or an `.xcconfig`.
 
-### 1. `xcodebuild` / CI — `x8 xcodebuild`
+### 1. `xcodebuild` and CI builds
 
 Wraps a normal `xcodebuild` invocation with an embedded, invocation-scoped
 proxy. No `.xcconfig` or `project.pbxproj` edits required:
@@ -160,7 +160,7 @@ argument) if your project sets these portability settings itself. See
 [Prefix mapping](Sources/X8Kit/X8Kit.docc/PrefixMapping.md) for what each
 setting does and which build shapes it cannot make portable.
 
-### 2. Xcode.app's GUI — ten build settings
+### 2. Xcode.app GUI builds
 
 Xcode's GUI builds can't be wrapped, so they need the settings Xcode's
 Compilation Cache plugin looks for, added directly to your target (or an

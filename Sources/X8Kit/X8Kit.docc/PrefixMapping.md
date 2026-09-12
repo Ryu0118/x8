@@ -14,7 +14,7 @@ sufficient: cross-worktree reuse still depends on the toolchain and on
 generated inputs such as macro plugin executables (see the known limitations
 below).
 
-## Logical paths, not shared physical directories
+## Normalizing paths without breaking output resolution
 
 Portable keys require equivalent inputs to use the same logical path before
 hashing. Diagnostics, debug information, generated metadata, and other outputs

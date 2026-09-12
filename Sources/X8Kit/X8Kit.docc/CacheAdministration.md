@@ -9,7 +9,7 @@ It executes only when the caller supplies confirmation and does not request a
 dry run. A custom CLI can therefore reuse the same safety policy while owning
 its own argument parsing, output format, and backend composition.
 
-## CAS purge derives its roots from the Action Cache
+## CAS purge root derivation
 
 A CAS scope requires an `actionCacheStore` in addition to the retention and
 reference-reading capabilities `X8Storage` already defines. The runner
