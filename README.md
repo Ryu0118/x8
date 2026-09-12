@@ -168,23 +168,10 @@ Compilation Cache plugin looks for, added directly to your target (or an
 Xcode's Build Settings UI, so add them by name). Together they tell Xcode to
 send cache traffic to x8's socket and to record build paths as portable
 `/^…` placeholders instead of machine-specific absolute paths, so cache
-entries match across machines. Copy the values exactly; you don't need to
-understand prefix mapping to use them:
+entries match across machines.
 
-| Build Setting | Value |
-| --- | --- |
-| `COMPILATION_CACHE_ENABLE_CACHING` | `YES` |
-| `COMPILATION_CACHE_ENABLE_PLUGIN` | `YES` |
-| `COMPILATION_CACHE_REMOTE_SERVICE_PATH` | the socket path a running `x8 serve` prints |
-| `SWIFT_ENABLE_PREFIX_MAPPING` | `YES` |
-| `SWIFT_ENABLE_PROJECT_PREFIX_MAPPING` | `YES` |
-| `CLANG_ENABLE_PREFIX_MAPPING` | `YES` |
-| `CLANG_ENABLE_PROJECT_PREFIX_MAPPING` | `YES` |
-| `CLANG_MODULES_BUILD_SESSION_FILE` | empty |
-| `SWIFT_OTHER_PREFIX_MAPPINGS` | `$(PROJECT_TEMP_DIR)=/^derived $(BUILT_PRODUCTS_DIR)=/^built $(OBJROOT)/../..=/^dd /path/to/workspace=/^workspace` |
-| `CLANG_OTHER_PREFIX_MAPPINGS` | `$(PROJECT_TEMP_DIR)=/^derived $(BUILT_PRODUCTS_DIR)=/^built $(OBJROOT)/../..=/^dd /path/to/workspace=/^workspace` |
-
-Start the long-lived proxy and print those exact values:
+Start the long-lived proxy and print the exact `SETTING=VALUE` pairs to add;
+you don't need to understand prefix mapping to use them:
 
 ```sh
 x8 serve --workspace-directory /path/to/workspace --print-cache-settings
@@ -203,7 +190,9 @@ SWIFT_ENABLE_PROJECT_PREFIX_MAPPING=YES
 SWIFT_OTHER_PREFIX_MAPPINGS=$(PROJECT_TEMP_DIR)=/^derived $(BUILT_PRODUCTS_DIR)=/^built $(OBJROOT)/../..=/^dd /path/to/workspace=/^workspace
 ```
 
-Keep `x8 serve` running (e.g. under a LaunchAgent) and build from Xcode.app
+Copy each line into your target's (or `.xcconfig`'s) user-defined build
+settings exactly as printed. Keep `x8 serve` running (e.g. under a
+LaunchAgent) and build from Xcode.app
 as usual. Use the same logical `/^workspace` replacement on every machine;
 neither mode relocates build outputs. The
 [Launchd guide](https://ryu0118.github.io/x8/documentation/x8kit/launchd)
