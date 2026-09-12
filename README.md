@@ -64,19 +64,6 @@ nest install Ryu0118/x8
 mise use -g github:Ryu0118/x8
 ```
 
-### Other methods
-
-Each [GitHub Release](https://github.com/Ryu0118/x8/releases) publishes a
-darwin universal binary archive and a SwiftPM `.artifactbundle`. To build
-from source instead:
-
-```sh
-git clone https://github.com/Ryu0118/x8.git
-cd x8
-swift build -c release --traits S3
-cp .build/release/x8 /usr/local/bin/x8
-```
-
 ## Quick Start
 
 1. Create `.x8.yml` at your project root:
