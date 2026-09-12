@@ -14,6 +14,13 @@ storage, and the local proxy, and ``CachePurgeRunner`` plans and executes
 cache maintenance. All of them receive storage boundaries instead of knowing
 how cache records are persisted.
 
+A CAS purge derives its live root set from the current Action Cache: the
+runner constructs `ActionCacheRootExtractor` and passes its `roots(in:)` as
+the closure `CachePurgePlanner` (in `X8Storage`) uses to read Xcode's
+`CompilationCacheService_Cas_V1_CASObject` reference lists at plan time.
+`X8Storage` never imports the generated protobuf type; only `X8Kit`, which
+owns it, does.
+
 Use X8CLI when you want the same command interface as the official S3-only
 `x8` executable with your own storage. Use X8Kit directly when you want a
 different command interface or are embedding the cache server in an existing
@@ -43,9 +50,8 @@ boundaries and profile identifiers.
 - ``XcodeServeHandle``
 - ``X8Doctor``
 - ``X8CacheStatsRunner``
-- <doc:Metrics>
 - <doc:XcodeCompilationCaching>
 - <doc:PrefixMapping>
 - <doc:XcodeCacheRuntime>
-- <doc:CacheAdministration>
+- ``CachePurgeRunner``
 - <doc:Launchd>

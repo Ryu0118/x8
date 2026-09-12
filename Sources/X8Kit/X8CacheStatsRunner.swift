@@ -6,6 +6,10 @@ import Foundation
 /// This runner owns the profile-path convention and filesystem read. It does
 /// not start a server or attempt to contact the cache backend, so `stats`
 /// remains a read-only diagnostic command.
+///
+/// The snapshot describes remote-cache traffic X8 observed directly. An
+/// Xcode build-system decision such as "up to date" is not a cache hit
+/// unless the proxy also observed the corresponding storage hit.
 public struct X8CacheStatsRunner: Sendable {
     private let fileManager: any FileManagerProtocolMacOS
 
