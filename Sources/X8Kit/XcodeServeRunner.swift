@@ -23,6 +23,7 @@ public struct XcodeServeRunner: Sendable {
     private let serverLifecycle: XcodeCacheServerLifecycle
     private let fileManager: any FileManagerProtocolMacOS
     private let workingDirectory: URL?
+    private let events: X8CacheEventBroadcaster
 
     /// Creates a standalone runner for one stable socket endpoint.
     ///
@@ -35,21 +36,27 @@ public struct XcodeServeRunner: Sendable {
     ///     handle's cache settings.
     ///   - fileManager: The filesystem dependency used for the endpoint
     ///     directory and cleanup.
+    ///   - metrics: The recorder receiving cache traffic observations. Every
+    ///     event also becomes available to ``startEventsSocket(profileID:)``,
+    ///     regardless of whether that socket is ever started.
     public init(
         socketPath: String,
         casStore: any CASStore,
         actionCacheStore: any ActionCacheStore,
         workingDirectory: URL? = nil,
-        fileManager: any FileManagerProtocolMacOS = FileManager.default
+        fileManager: any FileManagerProtocolMacOS = FileManager.default,
+        metrics: any X8CacheMetricsRecorder = X8CacheMetricsStore()
     ) {
+        let events = X8CacheEventBroadcaster(wrapping: metrics)
         self.init(
             socketPath: socketPath,
             casStore: casStore,
             actionCacheStore: actionCacheStore,
-            serverFactory: XcodeCacheServer.liveFactory(),
-            activatedServerFactory: XcodeCacheServer.liveActivatedFactory(),
+            serverFactory: XcodeCacheServer.liveFactory(metrics: events),
+            activatedServerFactory: XcodeCacheServer.liveActivatedFactory(metrics: events),
             workingDirectory: workingDirectory,
-            fileManager: fileManager
+            fileManager: fileManager,
+            events: events
         )
     }
 
@@ -62,7 +69,8 @@ public struct XcodeServeRunner: Sendable {
         activatedServerFactory: @escaping XcodeCacheActivatedServerFactory = XcodeCacheServer.liveActivatedFactory(),
         workingDirectory: URL? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default,
-        serverLifecycle: XcodeCacheServerLifecycle? = nil
+        serverLifecycle: XcodeCacheServerLifecycle? = nil,
+        events: X8CacheEventBroadcaster = X8CacheEventBroadcaster(wrapping: X8CacheMetricsStore())
     ) {
         self.socketPath = socketPath
         self.casStore = casStore
@@ -71,6 +79,7 @@ public struct XcodeServeRunner: Sendable {
         self.activatedServerFactory = activatedServerFactory
         self.workingDirectory = workingDirectory
         self.fileManager = fileManager
+        self.events = events
         self.serverLifecycle = serverLifecycle ?? XcodeCacheServerLifecycle(
             fileManager: fileManager
         )
@@ -115,6 +124,20 @@ public struct XcodeServeRunner: Sendable {
             .appending(path: "metrics.json")
     }
 
+    /// Returns the live cache-events socket path for a stable serve profile.
+    ///
+    /// The path is derived from the same profile directory as
+    /// ``defaultSocketPath(profileID:fileManager:)``; this keeps a tail
+    /// client from reconstructing a second runtime-path convention.
+    public static func defaultEventsSocketURL(
+        profileID: String,
+        fileManager: any FileManagerProtocolMacOS = FileManager.default
+    ) -> URL {
+        URL(filePath: defaultSocketPath(profileID: profileID, fileManager: fileManager))
+            .deletingLastPathComponent()
+            .appending(path: XcodeCacheRuntimeDirectory.eventsSocketFileName)
+    }
+
     /// Starts the server and returns once its socket endpoint is ready.
     ///
     /// An existing path is rejected rather than unlinked because it may belong
@@ -141,7 +164,14 @@ public struct XcodeServeRunner: Sendable {
             serverFactory: serverFactory,
             metricsFileURL: runtimeDirectory.url.appending(path: "metrics.json")
         )
-        return try XcodeServeHandle(session: session, workingDirectory: workingDirectory)
+        let eventsOutcome = await X8CacheEventsListener(broadcaster: events)
+            .start(at: runtimeDirectory.eventsSocketURL.path)
+        return try XcodeServeHandle(
+            session: session,
+            workingDirectory: workingDirectory,
+            eventsListenerOutcome: eventsOutcome,
+            eventsSocketCleanup: { runtimeDirectory.removeEventsSocket() }
+        )
     }
 
     /// Adopts one launchd socket and starts the long-lived cache server.
@@ -171,7 +201,14 @@ public struct XcodeServeRunner: Sendable {
             serverFactory: activatedServerFactory,
             metricsFileURL: runtimeDirectory.url.appending(path: "metrics.json")
         )
-        return try XcodeServeHandle(session: session, workingDirectory: workingDirectory)
+        let eventsOutcome = await X8CacheEventsListener(broadcaster: events)
+            .start(at: runtimeDirectory.eventsSocketURL.path)
+        return try XcodeServeHandle(
+            session: session,
+            workingDirectory: workingDirectory,
+            eventsListenerOutcome: eventsOutcome,
+            eventsSocketCleanup: { runtimeDirectory.removeEventsSocket() }
+        )
     }
 
     private func prepareSocketPath() throws {

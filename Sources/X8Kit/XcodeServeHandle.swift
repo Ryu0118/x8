@@ -22,15 +22,30 @@ public final class XcodeServeHandle: Sendable {
     /// constructs a handle has already validated its working directory.
     public let cacheEnvironment: [String: String]
 
+    /// Explains why the live cache-events socket did not start, if it did not.
+    ///
+    /// `nil` means the socket is serving connections, or that a caller
+    /// disabled it entirely. The events socket is a diagnostic convenience:
+    /// its absence never affects cache serving.
+    public let eventsSocketWarning: String?
+
     private let session: XcodeCacheServerSession
     private let makeTerminationSignalWaiter: @Sendable () -> any TerminationSignalWaiting
+    private let eventsTask: Task<Void, Never>?
+    private let eventsSocketCleanup: @Sendable () -> Void
 
     /// Waits until the server stops or its transport fails.
     ///
     /// The owned socket is cleaned up when the serving task completes. A
     /// transport failure is rethrown after that cleanup.
     public func wait() async throws {
-        try await session.wait()
+        do {
+            try await session.wait()
+        } catch {
+            stopEventsSocket()
+            throw error
+        }
+        stopEventsSocket()
     }
 
     /// Requests graceful shutdown and waits for active requests to drain.
@@ -39,6 +54,7 @@ public final class XcodeServeHandle: Sendable {
     /// task failures are observed internally while the endpoint is removed.
     public func shutdown() async {
         await session.shutdown()
+        stopEventsSocket()
     }
 
     /// Waits for a termination signal or server failure, then shuts down gracefully.
@@ -65,21 +81,38 @@ public final class XcodeServeHandle: Sendable {
     ///   starting the server this handle wraps, since an unrepresentable
     ///   working directory should fail before any server-side resource is
     ///   created.
+    /// - Parameter eventsListenerOutcome: The result of attempting to start
+    ///   the live cache-events socket, or `nil` when a caller never attempts
+    ///   one.
     package init(
         session: XcodeCacheServerSession,
         workingDirectory: URL? = nil,
         makeTerminationSignalWaiter: @escaping @Sendable () -> any TerminationSignalWaiting = {
             TerminationSignalWaiter()
-        }
+        },
+        eventsListenerOutcome: X8CacheEventsListenerOutcome? = nil,
+        eventsSocketCleanup: @escaping @Sendable () -> Void = {}
     ) throws {
         self.session = session
         self.makeTerminationSignalWaiter = makeTerminationSignalWaiter
+        self.eventsSocketCleanup = eventsSocketCleanup
         socketPath = session.socketPath
         cacheEnvironment = try XcodeCacheEnvironment.values(
             socketPath: socketPath,
             prefixMapping: .enabled,
             workingDirectory: workingDirectory
         )
+        switch eventsListenerOutcome {
+        case let .started(task):
+            eventsTask = task
+            eventsSocketWarning = nil
+        case let .skipped(reason):
+            eventsTask = nil
+            eventsSocketWarning = reason
+        case nil:
+            eventsTask = nil
+            eventsSocketWarning = nil
+        }
     }
 
     private func waitForServerOrTermination(
@@ -96,6 +129,11 @@ public final class XcodeServeHandle: Sendable {
             }
             return true
         }
+    }
+
+    private func stopEventsSocket() {
+        eventsTask?.cancel()
+        eventsSocketCleanup()
     }
 }
 

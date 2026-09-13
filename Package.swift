@@ -281,6 +281,14 @@ let package = Package(
                     name: "Subprocess",
                     package: "swift-subprocess"
                 ),
+                .product(
+                    name: "NIOCore",
+                    package: "swift-nio"
+                ),
+                .product(
+                    name: "NIOPosix",
+                    package: "swift-nio"
+                ),
             ]
         ),
         .testTarget(

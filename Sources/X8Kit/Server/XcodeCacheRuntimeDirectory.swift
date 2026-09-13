@@ -8,6 +8,8 @@ import Foundation
 /// hide the original process or transport failure.
 package struct XcodeCacheRuntimeDirectory: Sendable {
     static let socketFileName = "cache.sock"
+    /// The live cache-event tail endpoint, separate from the Xcode protocol socket.
+    static let eventsSocketFileName = "events.sock"
     let url: URL
     private static let permissions = 0o700
 
@@ -21,6 +23,11 @@ package struct XcodeCacheRuntimeDirectory: Sendable {
     /// The Unix socket endpoint inside this runtime directory.
     var socketURL: URL {
         url.appending(path: Self.socketFileName)
+    }
+
+    /// The live cache-event tail endpoint inside this runtime directory.
+    var eventsSocketURL: URL {
+        url.appending(path: Self.eventsSocketFileName)
     }
 
     /// Creates the directory and applies its private permissions.
@@ -47,6 +54,11 @@ package struct XcodeCacheRuntimeDirectory: Sendable {
     /// Removes only the socket endpoint without removing its parent directory.
     func removeSocket() {
         try? fileManager.removeItem(at: socketURL)
+    }
+
+    /// Removes only the events-tail socket endpoint, when one was ever bound.
+    func removeEventsSocket() {
+        try? fileManager.removeItem(at: eventsSocketURL)
     }
 
     /// Removes the socket and directory without masking the original failure.

@@ -51,6 +51,12 @@ struct ServeCommand: X8ExecutableCommand {
                 "✅ Cache server is ready at \(handle.socketPath).",
                 metadata: .color(.green)
             )
+            if let warning = handle.eventsSocketWarning {
+                context.logger.warning(
+                    "Live cache-events socket unavailable: \(warning). `x8 tail` will not connect.",
+                    metadata: .color(.yellow)
+                )
+            }
             try await handle.waitForTerminationSignal()
         }
     }

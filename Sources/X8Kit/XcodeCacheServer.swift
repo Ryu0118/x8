@@ -35,13 +35,17 @@ public final class XcodeCacheServer: XcodeCacheServing, Sendable {
     ///   socket's volume. `nil` keeps the response directory next to the
     ///   socket, which is correct whenever both live under the same home
     ///   volume.
-    package static func liveFactory(responseDirectory: URL? = nil) -> XcodeCacheServerFactory {
+    package static func liveFactory(
+        responseDirectory: URL? = nil,
+        metrics: any X8CacheMetricsRecorder = X8CacheMetricsStore()
+    ) -> XcodeCacheServerFactory {
         { socketPath, casStore, actionCacheStore, fileManager in
             XcodeCacheServer(
                 socketPath: socketPath,
                 casStore: casStore,
                 actionCacheStore: actionCacheStore,
                 fileManager: fileManager,
+                metrics: metrics,
                 responseDirectory: responseDirectory
             )
         }
@@ -50,7 +54,10 @@ public final class XcodeCacheServer: XcodeCacheServing, Sendable {
     /// Builds the live factory for a launchd-owned listening descriptor.
     ///
     /// - Parameter responseDirectory: See `liveFactory(responseDirectory:)`.
-    package static func liveActivatedFactory(responseDirectory: URL? = nil) -> XcodeCacheActivatedServerFactory {
+    package static func liveActivatedFactory(
+        responseDirectory: URL? = nil,
+        metrics: any X8CacheMetricsRecorder = X8CacheMetricsStore()
+    ) -> XcodeCacheActivatedServerFactory {
         { socketPath, listeningSocketDescriptor, casStore, actionCacheStore, fileManager in
             XcodeCacheServer(
                 activatedSocketPath: socketPath,
@@ -58,6 +65,7 @@ public final class XcodeCacheServer: XcodeCacheServing, Sendable {
                 casStore: casStore,
                 actionCacheStore: actionCacheStore,
                 fileManager: fileManager,
+                metrics: metrics,
                 responseDirectory: responseDirectory
             )
         }
