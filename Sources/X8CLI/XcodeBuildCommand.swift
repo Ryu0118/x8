@@ -52,7 +52,8 @@ struct XcodeBuildCommand: X8ExecutableCommand {
                 actionCacheStore: storage.actionCacheStore(role: configuration.role),
                 prefixMapping: prefixMapping,
                 workingDirectory: workingDirectory,
-                responseDirectory: buildArguments.responseDirectory
+                responseDirectory: buildArguments.responseDirectory,
+                eventsSocketURL: XcodeServeRunner.defaultEventsSocketURL(profileID: configuration.profileID)
             )
             let terminationStatus = try await Self.runXcodeBuild(
                 executable: executable,

@@ -22,6 +22,8 @@ public final class XcodeCacheSession: Sendable {
 
     private let serverSession: XcodeCacheServerSession
     private let runtimeDirectory: XcodeCacheRuntimeDirectory
+    private let eventsTask: Task<Void, Never>?
+    private let eventsSocketCleanup: @Sendable () -> Void
 
     /// Starts an invocation-scoped cache proxy.
     ///
@@ -40,6 +42,15 @@ public final class XcodeCacheSession: Sendable {
     ///     response files into DerivedData, and a directory on a different
     ///     filesystem makes that link fail with `EXDEV`. `nil` stages response
     ///     files next to the session's own runtime directory.
+    ///   - eventsSocketURL: When supplied, attempts to bind the live
+    ///     cache-events socket at this path, so `x8 tail` can observe this
+    ///     invocation's traffic. Callers that want the same socket
+    ///     ``XcodeServeRunner`` uses should pass
+    ///     `XcodeServeRunner.defaultEventsSocketURL(profileID:)`. Binding is
+    ///     fail-open: a concurrent `x8 serve` (or another invocation) already
+    ///     owning that socket leaves this session's cache traffic unobserved
+    ///     by `tail`, never unavailable. `nil` skips the events socket
+    ///     entirely.
     /// - Returns: A ready session whose socket can be passed to an external
     ///   Xcode client through `cacheEnvironment`.
     /// - Throws: If the runtime directory cannot be created or the cache server
@@ -50,15 +61,22 @@ public final class XcodeCacheSession: Sendable {
         prefixMapping: XcodeCachePrefixMapping = .enabled,
         workingDirectory: URL? = nil,
         fileManager: any FileManagerProtocol = FileManager.default,
-        responseDirectory: URL? = nil
+        responseDirectory: URL? = nil,
+        eventsSocketURL: URL? = nil
     ) async throws -> XcodeCacheSession {
-        try await start(
+        let events = X8CacheEventBroadcaster(wrapping: X8CacheMetricsStore())
+        return try await start(
             casStore: casStore,
             actionCacheStore: actionCacheStore,
-            serverFactory: XcodeCacheServer.liveFactory(responseDirectory: responseDirectory),
+            serverFactory: XcodeCacheServer.liveFactory(
+                responseDirectory: responseDirectory,
+                metrics: events
+            ),
             prefixMapping: prefixMapping,
             workingDirectory: workingDirectory,
-            fileManager: fileManager
+            fileManager: fileManager,
+            events: events,
+            eventsSocketURL: eventsSocketURL
         )
     }
 
@@ -69,6 +87,7 @@ public final class XcodeCacheSession: Sendable {
     /// underlying session.
     public func shutdown() async {
         await serverSession.shutdown()
+        stopEventsSocket()
         runtimeDirectory.remove()
     }
 
@@ -80,7 +99,9 @@ public final class XcodeCacheSession: Sendable {
         prefixMapping: XcodeCachePrefixMapping = .enabled,
         workingDirectory: URL? = nil,
         fileManager: any FileManagerProtocol = FileManager.default,
-        serverLifecycle: XcodeCacheServerLifecycle? = nil
+        serverLifecycle: XcodeCacheServerLifecycle? = nil,
+        events: X8CacheEventBroadcaster = X8CacheEventBroadcaster(wrapping: X8CacheMetricsStore()),
+        eventsSocketURL: URL? = nil
     ) async throws -> XcodeCacheSession {
         // Validate before creating any runtime state, so an unrepresentable
         // working directory fails fast without a server to clean up.
@@ -96,11 +117,15 @@ public final class XcodeCacheSession: Sendable {
                 actionCacheStore: actionCacheStore,
                 serverFactory: serverFactory
             )
+            let eventsOutcome = await startEventsListener(at: eventsSocketURL, events: events)
             return try XcodeCacheSession(
                 serverSession: serverSession,
                 runtimeDirectory: runtimeDirectory,
                 prefixMapping: prefixMapping,
-                workingDirectory: workingDirectory
+                workingDirectory: workingDirectory,
+                eventsListenerOutcome: eventsOutcome,
+                eventsSocketURL: eventsSocketURL,
+                fileManager: fileManager
             )
         } catch {
             runtimeDirectory.remove()
@@ -112,7 +137,10 @@ public final class XcodeCacheSession: Sendable {
         serverSession: XcodeCacheServerSession,
         runtimeDirectory: XcodeCacheRuntimeDirectory,
         prefixMapping: XcodeCachePrefixMapping,
-        workingDirectory: URL?
+        workingDirectory: URL?,
+        eventsListenerOutcome: X8CacheEventsListenerOutcome?,
+        eventsSocketURL: URL?,
+        fileManager: any FileManagerProtocol
     ) throws {
         self.serverSession = serverSession
         self.runtimeDirectory = runtimeDirectory
@@ -122,15 +150,42 @@ public final class XcodeCacheSession: Sendable {
             prefixMapping: prefixMapping,
             workingDirectory: workingDirectory
         )
+        switch eventsListenerOutcome {
+        case let .started(task):
+            eventsTask = task
+            eventsSocketCleanup = {
+                guard let eventsSocketURL else { return }
+                try? fileManager.removeItem(at: eventsSocketURL)
+            }
+        case .skipped, nil:
+            eventsTask = nil
+            eventsSocketCleanup = {}
+        }
     }
 
     deinit {
         let serverSession = self.serverSession
         let runtimeDirectory = self.runtimeDirectory
+        eventsTask?.cancel()
+        let eventsSocketCleanup = self.eventsSocketCleanup
         Task {
             await serverSession.shutdown()
+            eventsSocketCleanup()
             runtimeDirectory.remove()
         }
+    }
+
+    private func stopEventsSocket() {
+        eventsTask?.cancel()
+        eventsSocketCleanup()
+    }
+
+    private static func startEventsListener(
+        at eventsSocketURL: URL?,
+        events: X8CacheEventBroadcaster
+    ) async -> X8CacheEventsListenerOutcome? {
+        guard let eventsSocketURL else { return nil }
+        return await X8CacheEventsListener(broadcaster: events).start(at: eventsSocketURL.path)
     }
 
     private static func makeRuntimeDirectory(
