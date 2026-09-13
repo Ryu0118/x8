@@ -181,14 +181,19 @@ SWIFT_OTHER_PREFIX_MAPPINGS=$(PROJECT_TEMP_DIR)=/^derived $(BUILT_PRODUCTS_DIR)=
 ```
 
 Copy each line into your target's (or `.xcconfig`'s) user-defined build
-settings exactly as printed. Keep `x8 serve` running (e.g. under a
-LaunchAgent) and build from Xcode.app
-as usual. Use the same logical `/^workspace` replacement on every machine;
-neither mode relocates build outputs. The
-[Launchd guide](https://ryu0118.github.io/x8/documentation/x8kit/launchd)
+settings exactly as printed. Keep `x8 serve` running so Xcode always has a
+socket to connect to, then build from Xcode.app as usual. Use the same
+logical `/^workspace` replacement on every machine; neither mode relocates
+build outputs.
+
+For unattended startup and crash recovery, run `x8 serve --launchd` under a
+LaunchAgent instead of leaving a plain `x8 serve` in a terminal. That mode
+is launchd-specific: x8 adopts the listening socket via launchd's socket
+activation rather than binding it itself, so it only works when launchd
+started the process, and there is no `x8 stop` — launchd owns the
+lifecycle. The [Launchd guide](https://ryu0118.github.io/x8/documentation/x8kit/launchd)
 has the LaunchAgent template and the `launchctl` commands to start, stop,
-restart, and diagnose the service — there is no `x8 stop`; launchd owns that
-lifecycle.
+restart, and diagnose the service.
 
 ## Configuration
 
