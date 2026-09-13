@@ -75,6 +75,43 @@ struct X8CacheEventsListenerIntegrationTests {
         }
     }
 
+    @Test(
+        "cancelling right after accepted connections are buffered does not trap",
+        .timeLimit(.minutes(1)),
+        arguments: 0 ..< 10
+    )
+    func cancellingWithBufferedConnectionsDoesNotTrap(_: Int) async {
+        let path = temporarySocketPath()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+
+        let outcome = await X8CacheEventsListener(broadcaster: X8CacheEventBroadcaster(wrapping: X8CacheMetricsStore()))
+            .start(at: path)
+        guard case let .started(task) = outcome else {
+            Issue.record("Expected the listener to start.")
+            return
+        }
+
+        // Fire every connect without awaiting any of them, so several
+        // accepted child channels can still be sitting unconsumed in the
+        // listener's inbound stream at the instant cancel() lands. That is
+        // the window that used to trap: a writer built before this point
+        // dropped without `executeThenClose` finishing it.
+        let futures = (0 ..< 20).map { _ in
+            ClientBootstrap(group: .singletonMultiThreadedEventLoopGroup)
+                .connect(unixDomainSocketPath: path)
+        }
+        task.cancel()
+        for future in futures {
+            await closeIfConnected(future)
+        }
+        await task.value
+    }
+
+    private func closeIfConnected(_ future: EventLoopFuture<Channel>) async {
+        guard let channel = try? await future.get() else { return }
+        try? await channel.close().get()
+    }
+
     private func temporarySocketPath() -> String {
         FileManager.default.temporaryDirectory
             .appending(path: "x8-events-\(UUID().uuidString).sock")

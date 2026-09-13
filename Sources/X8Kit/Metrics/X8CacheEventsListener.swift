@@ -20,7 +20,7 @@ package enum X8CacheEventsListenerOutcome: Sendable {
 /// convenience, not part of the cache's correctness contract. This type never
 /// logs or prints; the caller decides how to surface a `.skipped` outcome.
 package struct X8CacheEventsListener: Sendable {
-    private typealias ServerChannel = NIOAsyncChannel<NIOAsyncChannel<Never, ByteBuffer>, Never>
+    private typealias ServerChannel = NIOAsyncChannel<Channel, Never>
 
     private let broadcaster: X8CacheEventBroadcaster
 
@@ -44,12 +44,7 @@ package struct X8CacheEventsListener: Sendable {
         do {
             server = try await ServerBootstrap(group: .singletonMultiThreadedEventLoopGroup)
                 .bind(unixDomainSocketPath: path, cleanupExistingSocketFile: true) { channel in
-                    channel.eventLoop.makeCompletedFuture {
-                        try NIOAsyncChannel(
-                            wrappingChannelSynchronously: channel,
-                            configuration: .init(inboundType: Never.self, outboundType: ByteBuffer.self)
-                        )
-                    }
+                    channel.eventLoop.makeSucceededFuture(channel)
                 }
         } catch {
             return .skipped(reason: "\(error)")
@@ -89,15 +84,32 @@ package struct X8CacheEventsListener: Sendable {
         }
     }
 
+    /// Wraps `channel` into a writer and immediately consumes it.
+    ///
+    /// The wrap happens here, not in the `ServerBootstrap` child channel
+    /// initializer, so a writer is never constructed until this call is
+    /// already committed to `executeThenClose`. A writer built earlier and
+    /// buffered in the accept stream can be dropped by listener cancellation
+    /// before this function ever runs, and `NIOAsyncChannel` traps if its
+    /// writer is deinitialized without `finish()` — which only
+    /// `executeThenClose` guarantees.
     private static func serve(
-        _ connection: NIOAsyncChannel<Never, ByteBuffer>,
+        _ channel: Channel,
         broadcaster: X8CacheEventBroadcaster
     ) async {
+        guard let connection = try? await channel.eventLoop.submit({
+            try NIOAsyncChannel<Never, ByteBuffer>(
+                wrappingChannelSynchronously: channel,
+                configuration: .init(inboundType: Never.self, outboundType: ByteBuffer.self)
+            )
+        }).get() else {
+            return
+        }
         let events = await broadcaster.subscribe()
         try? await connection.executeThenClose { _, outbound in
             for await event in events {
                 try Task.checkCancellation()
-                var buffer = connection.channel.allocator.buffer(capacity: 256)
+                var buffer = channel.allocator.buffer(capacity: 256)
                 buffer.writeString(X8CacheEventLine.line(for: event))
                 buffer.writeString("\n")
                 try await outbound.write(buffer)
