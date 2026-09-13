@@ -20,6 +20,7 @@ struct X8RootCommand: ParsableCommand {
             ServeCommand.self,
             CacheCommand.self,
             ConfigCommand.self,
+            TailCommand.self,
             StatsCommand.self,
             DoctorCommand.self,
         ],

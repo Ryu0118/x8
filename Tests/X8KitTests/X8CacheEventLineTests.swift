@@ -54,4 +54,24 @@ struct X8CacheEventLineTests {
         let expectedPrefix = String(repeating: "ff", count: X8CacheEventLine.keyPrefixByteCount)
         #expect(line.contains("\"key\":\"\(expectedPrefix)\""))
     }
+
+    @Test("round trips a rendered line back into structured fields")
+    func decodesRenderedLine() throws {
+        let event = X8CacheMetricsEvent(
+            operation: .put,
+            outcome: .stored,
+            byteCount: 99,
+            latency: .milliseconds(3.5),
+            rpc: "cas.put",
+            keyBytes: Data([0x0A, 0x0B])
+        )
+
+        let fields = try X8CacheEventLine.decode(X8CacheEventLine.line(for: event))
+
+        #expect(fields.rpc == "cas.put")
+        #expect(fields.outcome == "stored")
+        #expect(fields.key == "0a0b")
+        #expect(fields.bytes == 99)
+        #expect(fields.latencyMs == 3.5)
+    }
 }

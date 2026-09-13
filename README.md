@@ -228,6 +228,7 @@ role: consumer
 | --- | --- |
 | `x8 [xcodebuild] <xcodebuild> [args...]` | Run `xcodebuild` through an embedded, invocation-scoped cache proxy. |
 | `x8 serve` | Run a standalone proxy at a stable socket, for Xcode's GUI or a supervised long-lived process. |
+| `x8 tail` | Stream live cache traffic from a running `x8 serve` proxy. |
 | `x8 config validate` | Validate `.x8.yml` and its resolved values. |
 | `x8 config show` | Print resolved, non-secret configuration. |
 | `x8 doctor` | Check configuration, storage access, and the local proxy in one pass. |
