@@ -24,7 +24,12 @@ struct XcodeCacheActionCacheService: CompilationCacheService_Keyvalue_V1_KeyValu
         request: CompilationCacheService_Keyvalue_V1_GetValueRequest,
         context: GRPCCore.ServerContext
     ) async throws -> CompilationCacheService_Keyvalue_V1_GetValueResponse {
-        let metricContext = X8CacheMetricContext(operation: .get, metrics: metrics)
+        let metricContext = X8CacheMetricContext(
+            operation: .get,
+            metrics: metrics,
+            rpc: "kv.getValue",
+            keyBytes: request.key
+        )
         let response = try await X8CacheServiceSupport.perform(
             context: context,
             operation: { try await performGetValue(request, metrics: metricContext) },
@@ -38,7 +43,12 @@ struct XcodeCacheActionCacheService: CompilationCacheService_Keyvalue_V1_KeyValu
         request: CompilationCacheService_Keyvalue_V1_PutValueRequest,
         context: GRPCCore.ServerContext
     ) async throws -> CompilationCacheService_Keyvalue_V1_PutValueResponse {
-        let metricContext = X8CacheMetricContext(operation: .put, metrics: metrics)
+        let metricContext = X8CacheMetricContext(
+            operation: .put,
+            metrics: metrics,
+            rpc: "kv.putValue",
+            keyBytes: request.key
+        )
         let response = try await X8CacheServiceSupport.perform(
             context: context,
             operation: { try await performPutValue(request, metrics: metricContext) },

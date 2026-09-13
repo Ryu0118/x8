@@ -1,3 +1,4 @@
+import Foundation
 import X8Core
 import X8Storage
 
@@ -23,14 +24,25 @@ package struct X8CacheMetricContext: Sendable {
     private let metrics: any X8CacheMetricsRecorder
     private let counter: X8CacheByteCounter
     private let startedAt: ContinuousClock.Instant
+    private let rpc: String?
+    private let keyBytes: Data?
 
     /// Creates a request-scoped metrics context.
+    ///
+    /// - Parameters:
+    ///   - rpc: The wire-level RPC name, for per-event observers only.
+    ///   - keyBytes: The opaque CAS or Action Cache key bytes, for per-event
+    ///     observers only. Aggregate recording ignores both.
     package init(
         operation: X8CacheMetricOperation,
-        metrics: any X8CacheMetricsRecorder
+        metrics: any X8CacheMetricsRecorder,
+        rpc: String? = nil,
+        keyBytes: Data? = nil
     ) {
         self.operation = operation
         self.metrics = metrics
+        self.rpc = rpc
+        self.keyBytes = keyBytes
         counter = X8CacheByteCounter()
         startedAt = ContinuousClock.now
     }
@@ -50,8 +62,13 @@ package struct X8CacheMetricContext: Sendable {
     }
 
     /// Records the completed outcome and the bytes consumed by this request.
+    ///
+    /// - Parameter keyBytes: Overrides the key passed to `init` for RPCs
+    ///   (such as CAS `Put`/`Save`) whose key is only known once storage has
+    ///   generated it. `nil` keeps whatever `init` was given.
     package func finish(
-        outcome: X8CacheMetricOutcome
+        outcome: X8CacheMetricOutcome,
+        keyBytes: Data? = nil
     ) async {
         let byteCount = await counter.value()
         await metrics.record(
@@ -59,7 +76,9 @@ package struct X8CacheMetricContext: Sendable {
                 operation: operation,
                 outcome: outcome,
                 byteCount: byteCount,
-                latency: startedAt.duration(to: .now)
+                latency: startedAt.duration(to: .now),
+                rpc: rpc,
+                keyBytes: keyBytes ?? self.keyBytes
             )
         )
     }

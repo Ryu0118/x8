@@ -35,7 +35,12 @@ struct XcodeCacheCASService: CompilationCacheService_Cas_V1_CASDBService.SimpleS
         request: CompilationCacheService_Cas_V1_CASGetRequest,
         context: GRPCCore.ServerContext
     ) async throws -> CompilationCacheService_Cas_V1_CASGetResponse {
-        let metricContext = X8CacheMetricContext(operation: .get, metrics: metrics)
+        let metricContext = X8CacheMetricContext(
+            operation: .get,
+            metrics: metrics,
+            rpc: "cas.get",
+            keyBytes: request.hasCasID ? request.casID.id : nil
+        )
         let response = try await X8CacheServiceSupport.perform(
             context: context,
             operation: { try await performGet(request, metrics: metricContext) },
@@ -49,13 +54,16 @@ struct XcodeCacheCASService: CompilationCacheService_Cas_V1_CASDBService.SimpleS
         request: CompilationCacheService_Cas_V1_CASPutRequest,
         context: GRPCCore.ServerContext
     ) async throws -> CompilationCacheService_Cas_V1_CASPutResponse {
-        let metricContext = X8CacheMetricContext(operation: .put, metrics: metrics)
+        let metricContext = X8CacheMetricContext(operation: .put, metrics: metrics, rpc: "cas.put")
         let response = try await X8CacheServiceSupport.perform(
             context: context,
             operation: { try await performPut(request, metrics: metricContext) },
             errorResponse: XcodeCacheWire.casPutError
         )
-        await metricContext.finish(outcome: Self.outcome(for: response.contents))
+        await metricContext.finish(
+            outcome: Self.outcome(for: response.contents),
+            keyBytes: Self.keyBytes(for: response.contents)
+        )
         return response
     }
 
@@ -63,7 +71,12 @@ struct XcodeCacheCASService: CompilationCacheService_Cas_V1_CASDBService.SimpleS
         request: CompilationCacheService_Cas_V1_CASLoadRequest,
         context: GRPCCore.ServerContext
     ) async throws -> CompilationCacheService_Cas_V1_CASLoadResponse {
-        let metricContext = X8CacheMetricContext(operation: .get, metrics: metrics)
+        let metricContext = X8CacheMetricContext(
+            operation: .get,
+            metrics: metrics,
+            rpc: "cas.load",
+            keyBytes: request.hasCasID ? request.casID.id : nil
+        )
         let response = try await X8CacheServiceSupport.perform(
             context: context,
             operation: { try await performLoad(request, metrics: metricContext) },
@@ -77,13 +90,16 @@ struct XcodeCacheCASService: CompilationCacheService_Cas_V1_CASDBService.SimpleS
         request: CompilationCacheService_Cas_V1_CASSaveRequest,
         context: GRPCCore.ServerContext
     ) async throws -> CompilationCacheService_Cas_V1_CASSaveResponse {
-        let metricContext = X8CacheMetricContext(operation: .put, metrics: metrics)
+        let metricContext = X8CacheMetricContext(operation: .put, metrics: metrics, rpc: "cas.save")
         let response = try await X8CacheServiceSupport.perform(
             context: context,
             operation: { try await performSave(request, metrics: metricContext) },
             errorResponse: XcodeCacheWire.casSaveError
         )
-        await metricContext.finish(outcome: Self.outcome(for: response.contents))
+        await metricContext.finish(
+            outcome: Self.outcome(for: response.contents),
+            keyBytes: Self.keyBytes(for: response.contents)
+        )
         return response
     }
 
@@ -186,6 +202,20 @@ struct XcodeCacheCASService: CompilationCacheService_Cas_V1_CASDBService.SimpleS
             return .stored
         }
         return .remoteError
+    }
+
+    private static func keyBytes(
+        for contents: CompilationCacheService_Cas_V1_CASPutResponse.OneOf_Contents?
+    ) -> Data? {
+        guard case let .casID(id) = contents else { return nil }
+        return id.id
+    }
+
+    private static func keyBytes(
+        for contents: CompilationCacheService_Cas_V1_CASSaveResponse.OneOf_Contents?
+    ) -> Data? {
+        guard case let .casID(id) = contents else { return nil }
+        return id.id
     }
 
     private static func outcome(
