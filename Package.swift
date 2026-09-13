@@ -60,6 +60,10 @@ let package = Package(
             from: "2.0.0"
         ),
         .package(
+            url: "https://github.com/apple/swift-nio.git",
+            from: "2.101.3"
+        ),
+        .package(
             url: "https://github.com/grpc/grpc-swift-protobuf.git",
             from: "2.4.0"
         ),
@@ -185,6 +189,14 @@ let package = Package(
                 .product(
                     name: "AsyncOperations",
                     package: "swift-async-operations"
+                ),
+                .product(
+                    name: "NIOCore",
+                    package: "swift-nio"
+                ),
+                .product(
+                    name: "NIOPosix",
+                    package: "swift-nio"
                 ),
             ]
         ),
