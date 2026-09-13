@@ -165,11 +165,14 @@ send cache traffic to x8's socket and to record build paths as portable
 `/^…` placeholders instead of machine-specific absolute paths, so cache
 entries match across machines.
 
-Start the long-lived proxy and print the exact `SETTING=VALUE` pairs to add;
-you don't need to understand prefix mapping to use them:
+Start the long-lived proxy; it prints the exact `SETTING=VALUE` pairs to add,
+so you don't need to understand prefix mapping to use them. Run it from the
+project directory containing `.x8.yml`; `--workspace-directory` only matters
+when the Xcode workspace root is a different directory from where `.x8.yml`
+lives:
 
 ```sh
-x8 serve --workspace-directory /path/to/workspace --print-cache-settings
+x8 serve --workspace-directory /path/to/workspace
 ```
 
 ```text

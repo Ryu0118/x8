@@ -51,6 +51,8 @@ Copy the template below to `~/Library/LaunchAgents/<Label>.plist` and replace:
         <string>/path/to/x8</string>
         <string>serve</string>
         <string>--launchd</string>
+        <!-- Cache settings are printed by default; suppress that in a supervised log file. -->
+        <string>--no-print-cache-settings</string>
     </array>
 
     <!-- Directory containing .x8.yml. x8 reads the config from the CWD only. -->
@@ -180,9 +182,11 @@ not make generated macro plugin executables identical between worktrees, so
 macro-heavy targets can still miss across worktrees. See <doc:PrefixMapping>
 for that limitation.
 
-`x8 serve --print-cache-settings` prints the same ten lines for whichever
-socket the running instance serves; it is a convenience for foreground use,
-not a substitute for setting the same socket path in Xcode.
+`x8 serve` prints the same ten lines by default for whichever socket the
+running instance serves, which is a convenience for foreground use but not a
+substitute for setting the same socket path in Xcode. Pass
+`--no-print-cache-settings` (as in the LaunchAgent template above) to keep
+that output out of a supervised process's log file.
 
 ## Troubleshooting
 
