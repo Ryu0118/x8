@@ -104,12 +104,8 @@ mise use -g github:Ryu0118/x8
    x8 xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
    ```
 
-   If the build succeeds, x8 is proxying the cache: this first build
-   uploads each compiled module to your bucket, and a later build of the same
-   unchanged modules on another machine (or on this one after clearing
-   DerivedData) downloads them instead of running the compiler. That is all a
-   command-line or CI build needs. Building from Xcode.app instead uses a
-   long-running `x8 serve` plus a few build settings — see
+   That's all a command-line or CI build needs. Building from Xcode.app
+   instead uses a long-running `x8 serve` plus a few build settings — see
    [Xcode.app GUI builds](#2-xcodeapp-gui-builds) below.
 
 ## Enabling the remote cache
