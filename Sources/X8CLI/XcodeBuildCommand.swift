@@ -55,6 +55,12 @@ struct XcodeBuildCommand: X8ExecutableCommand {
                 responseDirectory: buildArguments.responseDirectory,
                 eventsSocketURL: XcodeServeRunner.defaultEventsSocketURL(profileID: configuration.profileID)
             )
+            if let warning = cacheSession.eventsSocketWarning {
+                context.logger.warning(
+                    "Live cache-events socket unavailable: \(warning). `x8 tail` will not connect.",
+                    metadata: .color(.yellow)
+                )
+            }
             let terminationStatus = try await Self.runXcodeBuild(
                 executable: executable,
                 arguments: buildArguments,

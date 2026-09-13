@@ -40,6 +40,20 @@ struct XcodeCacheSessionTests {
     }
 
     @Test
+    func skipsTheEventsSocketWhenNoURLIsSupplied() async throws {
+        let storage = InMemoryStorage()
+        let session = try await XcodeCacheSession.start(
+            casStore: storage,
+            actionCacheStore: storage,
+            serverFactory: { socketPath, _, _, _ in
+                TestCacheServer(socketPath: socketPath)
+            }
+        )
+        #expect(session.eventsSocketWarning == nil)
+        await session.shutdown()
+    }
+
+    @Test
     func doesNotReturnWhenTheServerStopsBeforeReadiness() async throws {
         let storage = InMemoryStorage()
 

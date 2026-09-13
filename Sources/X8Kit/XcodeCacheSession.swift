@@ -20,6 +20,14 @@ public final class XcodeCacheSession: Sendable {
     /// prefix-mapping settings and an empty module-validation session path.
     public let cacheEnvironment: [String: String]
 
+    /// Why the events socket was not bound, when it wasn't.
+    ///
+    /// `nil` when no `eventsSocketURL` was supplied, or when the socket
+    /// bound successfully. Set when binding was attempted and skipped, most
+    /// often because another process already owns that socket for the same
+    /// profile. The cache proxy is unaffected either way.
+    public let eventsSocketWarning: String?
+
     private let serverSession: XcodeCacheServerSession
     private let runtimeDirectory: XcodeCacheRuntimeDirectory
     private let eventsTask: Task<Void, Never>?
@@ -46,11 +54,12 @@ public final class XcodeCacheSession: Sendable {
     ///     cache-events socket at this path, so `x8 tail` can observe this
     ///     invocation's traffic. Callers that want the same socket
     ///     ``XcodeServeRunner`` uses should pass
-    ///     `XcodeServeRunner.defaultEventsSocketURL(profileID:)`. Binding is
-    ///     fail-open: a concurrent `x8 serve` (or another invocation) already
-    ///     owning that socket leaves this session's cache traffic unobserved
-    ///     by `tail`, never unavailable. `nil` skips the events socket
-    ///     entirely.
+    ///     `XcodeServeRunner.defaultEventsSocketURL(profileID:)`. The socket's
+    ///     parent directory is created if missing. Binding is fail-open: a
+    ///     concurrent `x8 serve` (or another invocation) already owning that
+    ///     socket leaves this session's cache traffic unobserved by `tail`,
+    ///     never unavailable — check ``eventsSocketWarning`` for the reason.
+    ///     `nil` skips the events socket entirely.
     /// - Returns: A ready session whose socket can be passed to an external
     ///   Xcode client through `cacheEnvironment`.
     /// - Throws: If the runtime directory cannot be created or the cache server
@@ -117,7 +126,11 @@ public final class XcodeCacheSession: Sendable {
                 actionCacheStore: actionCacheStore,
                 serverFactory: serverFactory
             )
-            let eventsOutcome = await startEventsListener(at: eventsSocketURL, events: events)
+            let eventsOutcome = await startEventsListener(
+                at: eventsSocketURL,
+                events: events,
+                fileManager: fileManager
+            )
             return try XcodeCacheSession(
                 serverSession: serverSession,
                 runtimeDirectory: runtimeDirectory,
@@ -153,12 +166,18 @@ public final class XcodeCacheSession: Sendable {
         switch eventsListenerOutcome {
         case let .started(task):
             eventsTask = task
+            eventsSocketWarning = nil
             eventsSocketCleanup = {
                 guard let eventsSocketURL else { return }
                 try? fileManager.removeItem(at: eventsSocketURL)
             }
-        case .skipped, nil:
+        case let .skipped(reason):
             eventsTask = nil
+            eventsSocketWarning = reason
+            eventsSocketCleanup = {}
+        case nil:
+            eventsTask = nil
+            eventsSocketWarning = nil
             eventsSocketCleanup = {}
         }
     }
@@ -182,9 +201,20 @@ public final class XcodeCacheSession: Sendable {
 
     private static func startEventsListener(
         at eventsSocketURL: URL?,
-        events: X8CacheEventBroadcaster
+        events: X8CacheEventBroadcaster,
+        fileManager: any FileManagerProtocol
     ) async -> X8CacheEventsListenerOutcome? {
         guard let eventsSocketURL else { return nil }
+        // XcodeServeRunner always creates its profile directory before this
+        // point; a caller reaching here on a machine where `x8 serve` has
+        // never run for this profile would otherwise hit a bind ENOENT and
+        // silently lose the events socket. Creation is fail-open like the
+        // bind itself: a failure here still lets `start(at:)` attempt the
+        // bind, which reports its own `.skipped` reason.
+        try? XcodeCacheRuntimeDirectory(
+            url: eventsSocketURL.deletingLastPathComponent(),
+            fileManager: fileManager
+        ).create(withIntermediateDirectories: true)
         return await X8CacheEventsListener(broadcaster: events).start(at: eventsSocketURL.path)
     }
 
