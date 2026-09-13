@@ -150,6 +150,11 @@ argument) if your project sets these portability settings itself. See
 [Prefix mapping](Sources/X8Kit/X8Kit.docc/PrefixMapping.md) for what each
 setting does and which build shapes it cannot make portable.
 
+While a build is running, `x8 tail` (run from another terminal in the same
+project) streams that invocation's cache traffic, the same as it would for
+`x8 serve`. See [Watching live cache traffic](#watching-live-cache-traffic)
+for how the two relate when both are running at once.
+
 ### 2. Xcode.app GUI builds
 
 Xcode's GUI builds can't be wrapped, so they need the settings Xcode's
@@ -194,6 +199,29 @@ started the process, and there is no `x8 stop` — launchd owns the
 lifecycle. The [Launchd guide](https://ryu0118.github.io/x8/documentation/x8kit/launchd)
 has the LaunchAgent template and the `launchctl` commands to start, stop,
 restart, and diagnose the service.
+
+## Watching live cache traffic
+
+`x8 tail` connects to a live cache-events socket and prints each cache
+request as it happens. Both `x8 serve` and `x8 xcodebuild` open this socket,
+so `x8 tail` works against either — there is nothing else to configure.
+
+The socket's identity comes from the *profile ID*, a hash of `.x8.yml`'s
+`version`, `endpoint`, `region`, and `bucket`, not from the directory you run
+x8 in. Two projects pointed at the same bucket/endpoint/region share one
+profile ID and one events socket; the same project run from two different
+directories also shares it. This is why `x8 tail` needs no arguments to find
+the right socket: it derives the same profile ID from the current directory's
+`.x8.yml` and connects to the matching path.
+
+Only one process can own the events socket for a given profile ID at a time.
+Binding is fail-open and attempted once, at startup: whichever of `x8 serve`
+or `x8 xcodebuild` starts first keeps the socket for its entire run, and the
+other's cache traffic stays invisible to `x8 tail` for that whole run, even
+after the first process exits and frees the socket. If you run both against
+the same profile — for example, a long-lived `x8 serve` alongside an
+`x8 xcodebuild` invocation for the same project — start `x8 serve` first so
+`x8 tail` can observe both.
 
 ## Configuration
 
@@ -240,7 +268,7 @@ role: consumer
 | --- | --- |
 | `x8 [xcodebuild] <xcodebuild> [args...]` | Run `xcodebuild` through an embedded, invocation-scoped cache proxy. |
 | `x8 serve` | Run a standalone proxy at a stable socket, for Xcode's GUI or a supervised long-lived process. |
-| `x8 tail` | Stream live cache traffic from a running `x8 serve` proxy. |
+| `x8 tail` | Stream live cache traffic from a running `x8 serve` or `x8 xcodebuild` invocation. |
 | `x8 config validate` | Validate `.x8.yml` and its resolved values. |
 | `x8 config show` | Print resolved, non-secret configuration. |
 | `x8 doctor` | Check configuration, storage access, and the local proxy in one pass. |
