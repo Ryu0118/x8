@@ -9,8 +9,12 @@ struct ServeCommand: X8ExecutableCommand {
         abstract: "Run a standalone Xcode cache proxy."
     )
 
-    @Flag(name: .long, help: "Print the cache environment and keep serving.")
-    var printCacheSettings = false
+    @Flag(
+        name: .long,
+        inversion: .prefixedNo,
+        help: "Print the cache settings to add to Xcode."
+    )
+    var printCacheSettings = true
 
     @Flag(name: .long, help: "Print only the socket path and keep serving.")
     var printSocket = false
@@ -23,12 +27,6 @@ struct ServeCommand: X8ExecutableCommand {
         help: "Physical workspace directory to map to /^workspace. Defaults to the current directory."
     )
     var workspaceDirectory: String?
-
-    mutating func validate() throws {
-        guard !(printCacheSettings && printSocket) else {
-            throw ValidationError("Choose either --print-cache-settings or --print-socket.")
-        }
-    }
 
     func run(context: X8CommandContext) async throws {
         let configured = try await context.loadConfiguration()
@@ -74,14 +72,14 @@ struct ServeCommand: X8ExecutableCommand {
         printSocket: Bool,
         output: X8CLIOutput
     ) {
-        if printCacheSettings {
-            handle.cacheEnvironment
-                .sorted { $0.key < $1.key }
-                .forEach { output.standardOutput("\($0.key)=\($0.value)") }
+        if printSocket {
+            output.standardOutput(handle.socketPath)
             return
         }
-        guard printSocket else { return }
-        output.standardOutput(handle.socketPath)
+        guard printCacheSettings else { return }
+        handle.cacheEnvironment
+            .sorted { $0.key < $1.key }
+            .forEach { output.standardOutput("\($0.key)=\($0.value)") }
     }
 
     private static func start(

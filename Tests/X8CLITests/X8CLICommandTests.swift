@@ -44,7 +44,6 @@ struct X8CLICommandTests {
     }
 
     @Test(arguments: [
-        ["serve", "--print-socket", "--print-cache-settings"],
         ["cache", "purge", "--scope", "wrong"],
         ["build"],
         ["xcodebuild", "xcodebuild", "build"],
