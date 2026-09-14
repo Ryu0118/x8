@@ -8,7 +8,7 @@ import Foundation
 /// not eliminate every path-sensitive compiler input. Keeping it in one place
 /// prevents standalone diagnostics and child-process injection from drifting
 /// apart.
-enum XcodeCacheEnvironment {
+package enum XcodeCacheEnvironment {
     /// A working directory cannot be represented in the space-separated
     /// `*_OTHER_PREFIX_MAPPINGS` value format Xcode expects.
     package enum WorkingDirectoryError: Error, Equatable, Sendable, CustomStringConvertible {
@@ -75,7 +75,11 @@ enum XcodeCacheEnvironment {
         _ = try prefixMappings(workingDirectory: workingDirectory)
     }
 
-    static func values(
+    /// Builds the Xcode cache-setting environment for one endpoint.
+    ///
+    /// - Throws: If `workingDirectory` cannot be represented in the
+    ///   prefix-mapping value format.
+    package static func values(
         socketPath: String,
         prefixMapping: XcodeCachePrefixMapping,
         workingDirectory: URL? = nil

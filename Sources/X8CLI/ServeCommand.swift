@@ -46,14 +46,31 @@ struct ServeCommand: X8ExecutableCommand {
 
     func run(context: X8CommandContext) async throws {
         guard let childReadyFileDescriptor else {
-            try await (detach ? runDetachedParent(context: context) : runForeground(context: context))
+            try await (detach ? runDetachedParent(context: context) : runServer(context: context, processRecord: nil))
             return
         }
-        try await runChild(context: context, readyFileDescriptor: childReadyFileDescriptor)
+        let executablePath = Self.resolvedExecutablePath()
+        let processRecord = LiveProcessLivenessProbe.currentProcessRecord(executablePath: executablePath)
+        try await runServer(context: context, processRecord: processRecord) {
+            Self.signalReadiness(on: childReadyFileDescriptor)
+        }
     }
 
-    /// Runs the cache proxy in the foreground, streaming events until terminated.
-    private func runForeground(context: X8CommandContext) async throws {
+    /// Runs the cache proxy until terminated, streaming events as they occur.
+    ///
+    /// Shared by the plain foreground path (`processRecord` `nil`) and the
+    /// detached child (`processRecord` identifying this process, so its
+    /// pidfile lock is claimed before the socket binds — see
+    /// `XcodeServeRunner.start()` for why that ordering closes the race a
+    /// child pre-writing its own pidfile would reopen). `afterReady` runs
+    /// once the server is ready, before streaming begins; the detached child
+    /// uses it to signal its parent. Standard output for the child is the
+    /// redirected `serve.log`, so it prints nothing a foreground run would not.
+    private func runServer(
+        context: X8CommandContext,
+        processRecord: XcodeServeProcessRecord?,
+        afterReady: @Sendable () -> Void = {}
+    ) async throws {
         let configured = try await context.loadConfiguration()
         let configuration = configured.configuration
         try await configured.withStorage { storage in
@@ -61,7 +78,8 @@ struct ServeCommand: X8ExecutableCommand {
                 socketPath: XcodeServeRunner.defaultSocketPath(profileID: configuration.profileID),
                 casStore: storage.casStore(role: configuration.role),
                 actionCacheStore: storage.actionCacheStore(role: configuration.role),
-                workingDirectory: Self.workingDirectory(from: workspaceDirectory)
+                workingDirectory: Self.workingDirectory(from: workspaceDirectory),
+                processRecord: processRecord
             )
             let handle = try await runner.start()
             Self.writeSettings(
@@ -80,38 +98,7 @@ struct ServeCommand: X8ExecutableCommand {
                     metadata: .color(.yellow)
                 )
             }
-            let streamingTask = Self.streamEvents(from: handle, output: context.output)
-            defer { streamingTask.cancel() }
-            try await handle.waitForTerminationSignal()
-        }
-    }
-
-    /// Runs as the detached child: starts the server, signals readiness, then waits.
-    ///
-    /// The child claims its own pidfile through `XcodeServeRunner`, using its
-    /// own process record, rather than the parent pre-writing one — see
-    /// `XcodeServeRunner.claimPIDFileLease` for why this ordering is load-bearing.
-    /// Standard output here is the redirected `serve.log`, so this path prints
-    /// nothing beyond what a foreground run would already log.
-    private func runChild(context: X8CommandContext, readyFileDescriptor: Int32) async throws {
-        let configured = try await context.loadConfiguration()
-        let configuration = configured.configuration
-        try await configured.withStorage { storage in
-            let executablePath = Self.resolvedExecutablePath()
-            let processRecord = LiveProcessLivenessProbe.currentProcessRecord(executablePath: executablePath)
-            let runner = XcodeServeRunner(
-                socketPath: XcodeServeRunner.defaultSocketPath(profileID: configuration.profileID),
-                casStore: storage.casStore(role: configuration.role),
-                actionCacheStore: storage.actionCacheStore(role: configuration.role),
-                workingDirectory: Self.workingDirectory(from: workspaceDirectory),
-                processRecord: processRecord
-            )
-            let handle = try await runner.start()
-            context.logger.info(
-                "✅ Cache server is ready at \(handle.socketPath).",
-                metadata: .color(.green)
-            )
-            Self.signalReadiness(on: readyFileDescriptor)
+            afterReady()
             let streamingTask = Self.streamEvents(from: handle, output: context.output)
             defer { streamingTask.cancel() }
             try await handle.waitForTerminationSignal()
@@ -151,10 +138,12 @@ struct ServeCommand: X8ExecutableCommand {
             timeout: .seconds(30),
             signaling: LiveProcessSignaling()
         )
-        try Self.report(outcome, profileID: profileID, logFileURL: logFileURL, context: context)
+        try report(outcome, profileID: profileID, logFileURL: logFileURL, context: context)
     }
 
-    private static func report(
+    /// Reports the detached launch's outcome, printing the same cache
+    /// settings a foreground `x8 serve` would once the child is confirmed ready.
+    private func report(
         _ outcome: ServeReadinessOutcome,
         profileID: String,
         logFileURL: URL,
@@ -163,7 +152,13 @@ struct ServeCommand: X8ExecutableCommand {
         switch outcome {
         case .ready:
             let socketPath = XcodeServeRunner.defaultSocketPath(profileID: profileID)
-            context.output.standardOutput(socketPath)
+            try Self.writeSettings(
+                socketPath: socketPath,
+                workingDirectory: Self.workingDirectory(from: workspaceDirectory),
+                printCacheSettings: printCacheSettings,
+                printSocket: printSocket,
+                output: context.output
+            )
             context.logger.info(
                 "✅ Cache server is running in the background at \(socketPath). Logs: \(logFileURL.path)",
                 metadata: .color(.green)
@@ -237,6 +232,31 @@ struct ServeCommand: X8ExecutableCommand {
         }
         guard printCacheSettings else { return }
         handle.cacheEnvironment
+            .sorted { $0.key < $1.key }
+            .forEach { output.standardOutput("\($0.key)=\($0.value)") }
+    }
+
+    /// Prints the same cache settings a foreground `x8 serve` would, computed
+    /// independently since the detached parent never holds a running
+    /// `XcodeServeHandle` of its own.
+    private static func writeSettings(
+        socketPath: String,
+        workingDirectory: URL,
+        printCacheSettings: Bool,
+        printSocket: Bool,
+        output: X8CLIOutput
+    ) throws {
+        if printSocket {
+            output.standardOutput(socketPath)
+            return
+        }
+        guard printCacheSettings else { return }
+        let cacheEnvironment = try XcodeCacheEnvironment.values(
+            socketPath: socketPath,
+            prefixMapping: .enabled,
+            workingDirectory: workingDirectory
+        )
+        cacheEnvironment
             .sorted { $0.key < $1.key }
             .forEach { output.standardOutput("\($0.key)=\($0.value)") }
     }

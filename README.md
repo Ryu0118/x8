@@ -189,7 +189,8 @@ logical `/^workspace` replacement on every machine; neither mode relocates
 build outputs.
 
 Run `x8 serve -d` (or `--detach`) instead to start the proxy in the
-background and return once it is ready, printing only the socket path:
+background and return once it is ready, printing the same cache settings
+above (or, with `--print-socket`, only the socket path):
 
 ```sh
 x8 serve -d --workspace-directory /path/to/workspace
