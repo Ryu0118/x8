@@ -2,7 +2,7 @@
 ///
 /// Descriptions identify fields or syntax without embedding credential values,
 /// so they can safely be surfaced by a frontend's diagnostics.
-public enum X8ConfigurationResolutionError: Error, Equatable, Sendable, CustomStringConvertible {
+package enum X8ConfigurationResolutionError: Error, Equatable, Sendable, CustomStringConvertible {
     /// The configuration schema version is not supported.
     case unsupportedVersion(Int)
 
@@ -25,7 +25,7 @@ public enum X8ConfigurationResolutionError: Error, Equatable, Sendable, CustomSt
     case expansionDepthExceeded
 
     /// A diagnostic description that never includes secret values.
-    public var description: String {
+    package var description: String {
         switch self {
         case let .unsupportedVersion(version):
             "X8 configuration version \(version) is not supported."

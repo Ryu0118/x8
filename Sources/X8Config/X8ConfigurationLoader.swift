@@ -9,7 +9,7 @@ import Foundation
 /// optional `.x8.local.yml`. It preserves optional and unresolved scalar values
 /// for the next stage. It does not apply defaults, expand environment
 /// parameters, validate provider values, or construct a storage backend.
-public struct X8ConfigurationLoader: Sendable {
+package struct X8ConfigurationLoader: Sendable {
     private let fileManager: any FileManagerProtocol
     private let locator: X8ConfigurationLocator
     private let decoder: X8ConfigurationDecoder
@@ -17,7 +17,7 @@ public struct X8ConfigurationLoader: Sendable {
     /// Creates a configuration loader.
     ///
     /// - Parameter fileManager: Filesystem dependency used to locate and read configuration files.
-    public init(fileManager: any FileManagerProtocol = FileManager.default) {
+    package init(fileManager: any FileManagerProtocol = FileManager.default) {
         self.fileManager = fileManager
         locator = X8ConfigurationLocator(fileManager: fileManager)
         decoder = X8ConfigurationDecoder(fileManager: fileManager)
@@ -34,7 +34,7 @@ public struct X8ConfigurationLoader: Sendable {
     /// - Returns: The merged raw document, retaining unresolved scalar values.
     /// - Throws: `X8ConfigurationLoadingError` when the base or an existing
     ///   override is unreadable or invalid.
-    public func load(
+    package func load(
         from directory: URL? = nil
     ) async throws -> X8ConfigurationDocument {
         let directory = directory ?? defaultCurrentDirectory

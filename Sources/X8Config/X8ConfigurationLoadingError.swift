@@ -5,7 +5,7 @@ import Foundation
 /// These errors describe the loader boundary only. Schema value validation and
 /// scalar expansion failures are reported separately by
 /// `X8ConfigurationResolutionError`.
-public enum X8ConfigurationLoadingError: Error, Equatable, Sendable, CustomStringConvertible {
+package enum X8ConfigurationLoadingError: Error, Equatable, Sendable, CustomStringConvertible {
     /// No `.x8.yml` was found in the requested directory.
     case configurationFileNotFound(directory: URL)
 
@@ -19,7 +19,7 @@ public enum X8ConfigurationLoadingError: Error, Equatable, Sendable, CustomStrin
     case unsupportedField(URL, String)
 
     /// A diagnostic description suitable for CLI output.
-    public var description: String {
+    package var description: String {
         switch self {
         case let .configurationFileNotFound(directory):
             "No .x8.yml found in \(directory.path)."

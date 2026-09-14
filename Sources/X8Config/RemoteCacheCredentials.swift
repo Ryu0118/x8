@@ -3,18 +3,18 @@
 /// The value is configuration data only; it does not refresh credentials or
 /// create a provider client. Frontends should avoid including these fields in
 /// profile identifiers, logs, or user-facing diagnostics.
-public struct RemoteCacheCredentials: Equatable, Sendable {
+package struct RemoteCacheCredentials: Equatable, Sendable {
     /// The access key used to authenticate object-store requests.
-    public let accessKeyID: String
+    package let accessKeyID: String
 
     /// The secret key used to authenticate object-store requests.
-    public let secretAccessKey: String
+    package let secretAccessKey: String
 
     /// The optional session token for temporary credentials.
-    public let sessionToken: String?
+    package let sessionToken: String?
 
     /// Creates credentials for a remote-cache profile.
-    public init(
+    package init(
         accessKeyID: String,
         secretAccessKey: String,
         sessionToken: String? = nil
@@ -32,13 +32,13 @@ extension RemoteCacheCredentials: CustomStringConvertible, CustomDebugStringConv
     /// interpolation footgun, but it is not a hard guarantee: `dump()` and
     /// direct `Mirror` reflection bypass it and still expose stored
     /// properties.
-    public var description: String {
+    package var description: String {
         "RemoteCacheCredentials(accessKeyID: \"\(accessKeyID)\", secretAccessKey: <redacted>, "
             + "sessionToken: \(sessionToken == nil ? "nil" : "<redacted>"))"
     }
 
     /// Redacts secrets the same way `description` does.
-    public var debugDescription: String {
+    package var debugDescription: String {
         description
     }
 }

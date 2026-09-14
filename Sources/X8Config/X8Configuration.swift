@@ -8,18 +8,18 @@ import X8Storage
 /// credentials, but no client or filesystem state. The executable uses it to
 /// construct S3 storage. `profileID` identifies the non-secret cache domain and
 /// is safe to use for stable local runtime paths.
-public struct X8Configuration: Equatable, Sendable {
+package struct X8Configuration: Equatable, Sendable {
     /// The configuration schema version.
-    public let version: Int
+    package let version: Int
 
     /// The object-store bucket containing the cache domain.
-    public let bucket: String
+    package let bucket: String
 
     /// The object-store signing region.
-    public let region: String
+    package let region: String
 
     /// The optional S3-compatible endpoint.
-    public let endpoint: URL?
+    package let endpoint: URL?
 
     /// Whether this invocation may push, pull, or both.
     ///
@@ -27,13 +27,13 @@ public struct X8Configuration: Equatable, Sendable {
     /// is intentionally excluded from `canonicalProfile`: a producer and a
     /// consumer invocation of the same repository configuration must resolve
     /// to the same profile and object-key space.
-    public let role: CacheRole
+    package let role: CacheRole
 
     /// The optional literal credentials resolved from configuration.
-    public let credentials: RemoteCacheCredentials?
+    package let credentials: RemoteCacheCredentials?
 
     /// Creates a remote-cache configuration value without performing validation.
-    public init(
+    package init(
         version: Int = 1,
         bucket: String,
         region: String = "us-east-1",
@@ -50,7 +50,7 @@ public struct X8Configuration: Equatable, Sendable {
     }
 
     /// A stable identifier for the non-secret profile and cache domain.
-    public var profileID: String {
+    package var profileID: String {
         let digest = SHA256.hash(data: Data(canonicalProfile.utf8))
         return digest.prefix(12).map { String(format: "%02x", $0) }.joined()
     }

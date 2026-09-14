@@ -4,34 +4,34 @@
 /// a higher-level resolver applies defaults, expansion, and validation. This
 /// type does not represent a usable backend configuration until that resolver
 /// stage succeeds.
-public struct X8ConfigurationDocument: Codable, Equatable, Sendable {
+package struct X8ConfigurationDocument: Codable, Equatable, Sendable {
     /// The configuration schema version, when present.
-    public let version: Int?
+    package let version: Int?
 
     /// The optional S3-compatible endpoint.
-    public let endpoint: String?
+    package let endpoint: String?
 
     /// The optional object-store signing region.
-    public let region: String?
+    package let region: String?
 
     /// The object-store bucket.
-    public let bucket: String?
+    package let bucket: String?
 
     /// Whether this invocation may push, pull, or both. Defaults to `.both`
     /// when absent.
-    public let role: CacheRole?
+    package let role: CacheRole?
 
     /// The optional access key identifier.
-    public let accessKeyID: String?
+    package let accessKeyID: String?
 
     /// The optional secret access key.
-    public let secretAccessKey: String?
+    package let secretAccessKey: String?
 
     /// The optional session token.
-    public let sessionToken: String?
+    package let sessionToken: String?
 
     /// Creates a raw configuration document without validating its values.
-    public init(
+    package init(
         version: Int? = nil,
         endpoint: String? = nil,
         region: String? = nil,

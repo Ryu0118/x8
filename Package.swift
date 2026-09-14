@@ -11,8 +11,6 @@ let package = Package(
         .executable(name: "x8", targets: ["x8"]),
         .library(name: "X8Core", targets: ["X8Core"]),
         .library(name: "X8Storage", targets: ["X8Storage"]),
-        .library(name: "X8S3", targets: ["X8S3"]),
-        .library(name: "X8Config", targets: ["X8Config"]),
         .library(name: "X8Kit", targets: ["X8Kit"]),
         .library(name: "X8CLI", targets: ["X8CLI"]),
     ],

@@ -8,9 +8,9 @@ import Foundation
 /// network I/O and never selects or constructs a storage provider. The supplied
 /// environment is copied into an isolated expansion context, so assignment
 /// expressions cannot mutate the caller's process environment.
-public struct X8ConfigurationResolver: Sendable {
+package struct X8ConfigurationResolver: Sendable {
     /// Creates a configuration resolver.
-    public init() {}
+    package init() {}
 
     /// Expands, validates, and resolves a raw configuration document.
     ///
@@ -24,7 +24,7 @@ public struct X8ConfigurationResolver: Sendable {
     /// - Throws: `X8ConfigurationResolutionError` for unsupported versions,
     ///   missing or invalid fields, incomplete credentials, or unsupported
     ///   scalar expansion syntax.
-    public func resolve(
+    package func resolve(
         _ document: X8ConfigurationDocument,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> X8Configuration {
