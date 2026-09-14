@@ -15,7 +15,7 @@ import X8Storage
 /// The runner does not install a supervisor or persist cache data itself. The
 /// supplied storage implementations determine where CAS and Action Cache
 /// records live.
-public struct XcodeServeRunner: Sendable {
+package struct XcodeServeRunner: Sendable {
     private let socketPath: String
     private let casStore: any CASStore
     private let actionCacheStore: any ActionCacheStore
@@ -25,6 +25,7 @@ public struct XcodeServeRunner: Sendable {
     private let workingDirectory: URL?
     private let events: X8CacheEventBroadcaster
     private let livenessProbe: any ProcessLivenessProbing
+    private let processRecord: XcodeServeProcessRecord?
 
     /// Creates a standalone runner for one stable socket endpoint.
     ///
@@ -47,14 +48,20 @@ public struct XcodeServeRunner: Sendable {
     ///     socket with no pidfile at all is still reclaimed once nothing
     ///     answers on it. A frontend that can check process liveness should
     ///     inject its live implementation here.
-    public init(
+    ///   - processRecord: Identifies the process starting this server, so its
+    ///     pidfile can be claimed before binding and removed on shutdown.
+    ///     `nil` (the default) skips the pidfile entirely, for a caller such
+    ///     as foreground `x8 serve` that has no separate detached process to
+    ///     track.
+    package init(
         socketPath: String,
         casStore: any CASStore,
         actionCacheStore: any ActionCacheStore,
         workingDirectory: URL? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default,
         metrics: any X8CacheMetricsRecorder = X8CacheMetricsStore(),
-        livenessProbe: any ProcessLivenessProbing = AlwaysAliveProcessLivenessProbe()
+        livenessProbe: any ProcessLivenessProbing = AlwaysAliveProcessLivenessProbe(),
+        processRecord: XcodeServeProcessRecord? = nil
     ) {
         let events = X8CacheEventBroadcaster(wrapping: metrics)
         self.init(
@@ -65,7 +72,8 @@ public struct XcodeServeRunner: Sendable {
             workingDirectory: workingDirectory,
             fileManager: fileManager,
             events: events,
-            livenessProbe: livenessProbe
+            livenessProbe: livenessProbe,
+            processRecord: processRecord
         )
     }
 
@@ -79,7 +87,8 @@ public struct XcodeServeRunner: Sendable {
         fileManager: any FileManagerProtocolMacOS = FileManager.default,
         serverLifecycle: XcodeCacheServerLifecycle? = nil,
         events: X8CacheEventBroadcaster = X8CacheEventBroadcaster(wrapping: X8CacheMetricsStore()),
-        livenessProbe: any ProcessLivenessProbing = AlwaysAliveProcessLivenessProbe()
+        livenessProbe: any ProcessLivenessProbing = AlwaysAliveProcessLivenessProbe(),
+        processRecord: XcodeServeProcessRecord? = nil
     ) {
         self.socketPath = socketPath
         self.casStore = casStore
@@ -89,6 +98,7 @@ public struct XcodeServeRunner: Sendable {
         self.fileManager = fileManager
         self.events = events
         self.livenessProbe = livenessProbe
+        self.processRecord = processRecord
         self.serverLifecycle = serverLifecycle ?? XcodeCacheServerLifecycle(
             fileManager: fileManager
         )
@@ -104,7 +114,7 @@ public struct XcodeServeRunner: Sendable {
     ///     independent cache endpoints.
     ///   - fileManager: Filesystem dependency used to resolve the application
     ///     support directory.
-    public static func defaultSocketPath(
+    package static func defaultSocketPath(
         profileID: String,
         fileManager: any FileManagerProtocolMacOS = FileManager.default
     ) -> String {
@@ -124,7 +134,7 @@ public struct XcodeServeRunner: Sendable {
     /// The path is derived from the same profile directory as
     /// ``defaultSocketPath(profileID:fileManager:)``; this keeps diagnostics
     /// from reconstructing a second runtime-path convention.
-    public static func defaultMetricsFileURL(
+    package static func defaultMetricsFileURL(
         profileID: String,
         fileManager: any FileManagerProtocolMacOS = FileManager.default
     ) -> URL {
@@ -138,13 +148,41 @@ public struct XcodeServeRunner: Sendable {
     /// The path is derived from the same profile directory as
     /// ``defaultSocketPath(profileID:fileManager:)``; this keeps a tail
     /// client from reconstructing a second runtime-path convention.
-    public static func defaultEventsSocketURL(
+    package static func defaultEventsSocketURL(
         profileID: String,
         fileManager: any FileManagerProtocolMacOS = FileManager.default
     ) -> URL {
         URL(filePath: defaultSocketPath(profileID: profileID, fileManager: fileManager))
             .deletingLastPathComponent()
             .appending(path: XcodeCacheRuntimeDirectory.eventsSocketFileName)
+    }
+
+    /// Returns the detached server's process-record file for a stable serve profile.
+    ///
+    /// The path is derived from the same profile directory as
+    /// ``defaultSocketPath(profileID:fileManager:)``; this keeps a stop
+    /// command from reconstructing a second runtime-path convention.
+    package static func defaultPIDFileURL(
+        profileID: String,
+        fileManager: any FileManagerProtocolMacOS = FileManager.default
+    ) -> URL {
+        URL(filePath: defaultSocketPath(profileID: profileID, fileManager: fileManager))
+            .deletingLastPathComponent()
+            .appending(path: XcodeCacheRuntimeDirectory.pidFileName)
+    }
+
+    /// Returns the detached server's redirected stdout/stderr file for a stable serve profile.
+    ///
+    /// The path is derived from the same profile directory as
+    /// ``defaultSocketPath(profileID:fileManager:)``; this keeps a detach
+    /// launcher from reconstructing a second runtime-path convention.
+    package static func defaultLogFileURL(
+        profileID: String,
+        fileManager: any FileManagerProtocolMacOS = FileManager.default
+    ) -> URL {
+        URL(filePath: defaultSocketPath(profileID: profileID, fileManager: fileManager))
+            .deletingLastPathComponent()
+            .appending(path: XcodeCacheRuntimeDirectory.logFileName)
     }
 
     /// Starts the server and returns once its socket endpoint is ready.
@@ -160,7 +198,7 @@ public struct XcodeServeRunner: Sendable {
     /// - Returns: A handle for observing or stopping the running server.
     /// - Throws: If the endpoint is occupied, its directory cannot be prepared,
     ///   or the server fails before readiness.
-    public func start() async throws -> XcodeServeHandle {
+    package func start() async throws -> XcodeServeHandle {
         try XcodeCacheEnvironment.validate(workingDirectory: workingDirectory)
         let socketURL = URL(filePath: socketPath)
         let directory = socketURL.deletingLastPathComponent()
@@ -170,12 +208,16 @@ public struct XcodeServeRunner: Sendable {
         )
         try runtimeDirectory.create(withIntermediateDirectories: true)
         try await prepareSocketPath(runtimeDirectory: runtimeDirectory)
+        if let processRecord {
+            try claimPIDFile(runtimeDirectory: runtimeDirectory, record: processRecord)
+        }
         let session = try await serverLifecycle.start(
             runtimeDirectory: runtimeDirectory,
             casStore: casStore,
             actionCacheStore: actionCacheStore,
             serverFactory: serverFactory,
-            metricsFileURL: runtimeDirectory.url.appending(path: "metrics.json")
+            metricsFileURL: runtimeDirectory.url.appending(path: "metrics.json"),
+            ownsPIDFile: processRecord != nil
         )
         let eventsOutcome = await X8CacheEventsListener(broadcaster: events)
             .start(at: runtimeDirectory.eventsSocketURL.path)
@@ -209,6 +251,53 @@ public struct XcodeServeRunner: Sendable {
         // fall through to a confusing bind failure against the file that remains.
         try fileManager.removeItem(atPath: socketPath)
         runtimeDirectory.removePIDFile()
+    }
+
+    /// Claims the pidfile for `record` before the server binds its socket.
+    ///
+    /// The write is atomic (`O_EXCL`-equivalent) so two runners racing to
+    /// start the same profile cannot both believe they own it: whichever
+    /// loses the race sees the other's file already exist and either backs
+    /// off (the winner is alive) or reclaims a leftover file from a process
+    /// that is no longer running, retrying exactly once. This keeps "the
+    /// pidfile exists" a precondition of "the socket is bound," so a
+    /// concurrent stale-socket check never has to guess whether a pidfile
+    /// belongs to the process currently claiming the path.
+    private func claimPIDFile(
+        runtimeDirectory: XcodeCacheRuntimeDirectory,
+        record: XcodeServeProcessRecord,
+        allowRetry: Bool = true
+    ) throws {
+        let data = try JSONEncoder().encode(record)
+        do {
+            try data.write(to: runtimeDirectory.pidFileURL, options: .withoutOverwriting)
+        } catch CocoaError.fileWriteFileExists {
+            try reclaimPIDFileAfterExistingClaim(
+                runtimeDirectory: runtimeDirectory,
+                record: record,
+                allowRetry: allowRetry
+            )
+        }
+    }
+
+    /// Handles an `O_EXCL`-style write losing the pidfile-claim race.
+    ///
+    /// Split out of ``claimPIDFile(runtimeDirectory:record:allowRetry:)``
+    /// purely to keep that method's own nesting shallow; the retry-once
+    /// contract described there is unchanged.
+    private func reclaimPIDFileAfterExistingClaim(
+        runtimeDirectory: XcodeCacheRuntimeDirectory,
+        record: XcodeServeProcessRecord,
+        allowRetry: Bool
+    ) throws {
+        guard allowRetry else {
+            throw XcodeCacheServerError.socketPathOccupied(socketPath: socketPath)
+        }
+        if let existing = readProcessRecord(at: runtimeDirectory.pidFileURL), livenessProbe.isAlive(existing) {
+            throw XcodeCacheServerError.socketPathOccupied(socketPath: socketPath)
+        }
+        runtimeDirectory.removePIDFile()
+        try claimPIDFile(runtimeDirectory: runtimeDirectory, record: record, allowRetry: false)
     }
 
     private func readProcessRecord(at url: URL) -> XcodeServeProcessRecord? {

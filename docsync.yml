@@ -27,7 +27,7 @@ rules:
   doc: Sources/X8CLI/X8CLI.docc/StorageLifetime.md
   message: Storage ownership or capabilities changed - verify lifetime and administration
     documentation.
-  checksum: 9ffd3828d45f421e50723428bdd1504991715ab854b6519a7a3d4ea7d1dce2dc
+  checksum: d171240cb532104ea69fe0674f71dae50345f0abff52e62f62cad93bb683ee35
 - name: readme-cli
   sources:
   - Sources/X8CLI/XcodeBuildArguments.swift
@@ -43,7 +43,7 @@ rules:
   doc: README.md
   message: CLI command surface changed - update the README Commands table and Enabling
     the remote cache section if commands, flags, or usage changed.
-  checksum: a920a86d1e3259f859fad9dab08e0315aedaaa89e8dfcd269e322492251ec8fa
+  checksum: 4424ba878d1db0f51bf8bdda9e7dcdb64526e4ee3e3f51eb3185ad308c20d505
 - name: readme-configuration
   sources:
   - Sources/X8Config/X8ConfigurationDocument.swift
@@ -54,7 +54,7 @@ rules:
   doc: README.md
   message: .x8.yml configuration schema changed - update the README Setup and Configuration
     sections if fields, defaults, or validation changed.
-  checksum: 8aa26d63321a74c003c0e7308ef565c91b346113a5441ee0a6aaf189aa0a424c
+  checksum: a3538c3f5ae07e4e70e5c06239408019c05ba31516cbce419b610651ae5d57f2
 - name: prefix-mapping
   sources:
   - Sources/X8CLI/XcodeBuildArguments.swift

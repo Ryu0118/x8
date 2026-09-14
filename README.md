@@ -188,6 +188,25 @@ socket to connect to, then build from Xcode.app as usual. Use the same
 logical `/^workspace` replacement on every machine; neither mode relocates
 build outputs.
 
+Run `x8 serve -d` (or `--detach`) instead to start the proxy in the
+background and return once it is ready, printing only the socket path:
+
+```sh
+x8 serve -d --workspace-directory /path/to/workspace
+```
+
+The detached process keeps running after the terminal closes; its stdout and
+stderr go to a `serve.log` next to its socket (rotated to `serve.log.1` on the
+next `-d`). Stop it with:
+
+```sh
+x8 serve stop
+```
+
+`stop` sends a graceful shutdown signal, waits briefly, force-kills if it does
+not exit, and removes its socket and process-record files. It reports success
+even if no detached process was running for the current profile.
+
 ## Watching live cache traffic
 
 `x8 tail` connects to a live cache-events socket and prints each cache
@@ -258,6 +277,8 @@ role: consumer
 | --- | --- |
 | `x8 [xcodebuild] <xcodebuild> [args...]` | Run `xcodebuild` through an embedded, invocation-scoped cache proxy. |
 | `x8 serve` | Run a standalone proxy at a stable socket, for Xcode's GUI or a supervised long-lived process. |
+| `x8 serve -d` / `--detach` | Run the standalone proxy in the background and return once it is ready. |
+| `x8 serve stop` | Stop a detached `x8 serve -d` process for the current profile. |
 | `x8 tail` | Stream live cache traffic from a running `x8 serve` or `x8 xcodebuild` invocation. |
 | `x8 config validate` | Validate `.x8.yml` and its resolved values. |
 | `x8 config show` | Print resolved, non-secret configuration. |
