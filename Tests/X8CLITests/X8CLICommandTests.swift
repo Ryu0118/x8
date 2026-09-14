@@ -5,14 +5,7 @@ import X8Storage
 
 @Suite("Shared commands resolve custom configuration only when needed")
 struct X8CLICommandTests {
-    @Test(arguments: [
-        ["--help"],
-        ["--version"],
-        ["help", "serve"],
-        ["config", "--help"],
-        ["launchd", "--help"],
-        ["--generate-completion-script", "zsh"],
-    ])
+    @Test(arguments: [["--help"], ["--version"], ["help", "serve"], ["config", "--help"], ["--generate-completion-script", "zsh"]])
     func bypassesConfigurationForParserRequests(arguments: [String]) async {
         let recorder = CLIRecorder()
         let cli = recorder.capturing(X8CLI(

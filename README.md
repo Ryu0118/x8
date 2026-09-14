@@ -194,13 +194,14 @@ socket to connect to, then build from Xcode.app as usual. Use the same
 logical `/^workspace` replacement on every machine; neither mode relocates
 build outputs.
 
-For unattended startup and crash recovery, run `x8 launchd install` from the
-project directory instead of leaving a plain `x8 serve` in a terminal. It
-generates and bootstraps a LaunchAgent that runs `x8 serve --launchd`, so
-launchd restarts the proxy on crash, login, and reboot; `x8 launchd status`
-and `x8 launchd uninstall` manage it afterward. The
-[Launchd guide](https://ryu0118.github.io/x8/documentation/x8kit/launchd)
-covers what gets generated and how to troubleshoot it.
+For unattended startup and crash recovery, run `x8 serve --launchd` under a
+LaunchAgent instead of leaving a plain `x8 serve` in a terminal. That mode
+is launchd-specific: x8 adopts the listening socket via launchd's socket
+activation rather than binding it itself, so it only works when launchd
+started the process, and there is no `x8 stop` — launchd owns the
+lifecycle. The [Launchd guide](https://ryu0118.github.io/x8/documentation/x8kit/launchd)
+has the LaunchAgent template and the `launchctl` commands to start, stop,
+restart, and diagnose the service.
 
 ## Watching live cache traffic
 
@@ -275,9 +276,6 @@ role: consumer
 | `x8 config show` | Print resolved, non-secret configuration. |
 | `x8 doctor` | Check configuration, storage access, and the local proxy in one pass. |
 | `x8 cache purge` | Plan or delete aged staging/Action Cache objects, or unreachable CAS objects. |
-| `x8 launchd install` | Generate and bootstrap a LaunchAgent that runs `x8 serve --launchd` for the current `.x8.yml`. |
-| `x8 launchd uninstall` | Bootout and remove that LaunchAgent. |
-| `x8 launchd status` | Show launchd's status for that LaunchAgent. |
 
 Run `x8 help <subcommand>` for full flag documentation. `cache purge`'s
 `--older-than` and `--grace-period` accept a number followed by `ms`, `s`,
