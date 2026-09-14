@@ -18,7 +18,7 @@
     /// Administrative listing, conditional deletion, and retention methods are
     /// separate protocol conformances in this module. The storage actor does
     /// not choose purge policy; `X8Storage` owns that provider-neutral policy.
-    public actor S3Storage: CASStore, ActionCacheStore {
+    package actor S3Storage: CASStore, ActionCacheStore {
         /// Bounds metadata values that the backend must decode in memory.
         package static let maximumBufferedObjectBytes = 16 * 1024 * 1024
 
@@ -47,7 +47,7 @@
         ///     for this cache domain.
         ///   - fileManager: Filesystem dependency used for bounded CAS staging
         ///     files.
-        public init(
+        package init(
             configuration: S3StorageConfiguration,
             fileManager: any FileManagerProtocol = FileManager.default
         ) {
@@ -107,7 +107,7 @@
         ///
         /// The operation is idempotent. The injected-object-client initializer
         /// has no live clients to shut down.
-        public func shutdown() async throws {
+        package func shutdown() async throws {
             if let awsClient {
                 try await awsClient.shutdown()
                 self.awsClient = nil
@@ -123,28 +123,28 @@
         /// The provider envelope header is decoded before the payload is
         /// returned as a lazy stream. This allows reference metadata to be
         /// inspected without buffering the complete CAS object.
-        public func get(id: CASDataID) async throws -> CASObject? {
+        package func get(id: CASDataID) async throws -> CASObject? {
             guard let record = try await getCASRecord(id: id) else { return nil }
             return CASObject(bytes: record.bytes, references: record.references)
         }
 
         /// Stores a CAS object and returns its backend-generated opaque identifier.
-        public func put(_ object: CASObject) async throws -> CASDataID {
+        package func put(_ object: CASObject) async throws -> CASDataID {
             try await storeCAS(bytes: object.bytes, references: object.references)
         }
 
         /// Returns CAS payload bytes, or `nil` when the identifier is absent.
-        public func load(id: CASDataID) async throws -> ByteStream? {
+        package func load(id: CASDataID) async throws -> ByteStream? {
             try await getCASRecord(id: id)?.bytes
         }
 
         /// Stores blob bytes and returns their backend-generated opaque identifier.
-        public func save(_ bytes: ByteStream) async throws -> CASDataID {
+        package func save(_ bytes: ByteStream) async throws -> CASDataID {
             try await storeCAS(bytes: bytes, references: [])
         }
 
         /// Returns the action-cache value for a key, or `nil` when absent.
-        public func getValue(for key: ActionCacheKey) async throws -> ActionCacheValue? {
+        package func getValue(for key: ActionCacheKey) async throws -> ActionCacheValue? {
             guard let stream = try await objectClient.get(
                 bucket: configuration.bucket,
                 key: keySpace.actionCache(key: key.rawValue)
@@ -157,7 +157,7 @@
         }
 
         /// Replaces the action-cache value for a key.
-        public func putValue(_ value: ActionCacheValue, for key: ActionCacheKey) async throws {
+        package func putValue(_ value: ActionCacheValue, for key: ActionCacheKey) async throws {
             let dedupeKey = ActionCacheDedupeKey(key: key, value: value)
             try await actionCacheDeduplicator.withDeduplication(key: dedupeKey) { [objectClient, configuration, keySpace] in
                 let data = S3StorageCodec.encodeActionCache(value)
