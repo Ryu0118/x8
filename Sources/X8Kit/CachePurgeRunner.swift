@@ -6,15 +6,15 @@ import X8Storage
 /// objects. `result` is `nil` for dry runs and unconfirmed requests; it is
 /// populated only after the provider-neutral executor has revalidated the
 /// plan and attempted conditional deletions.
-public struct CachePurgeOutcome: Sendable {
+package struct CachePurgeOutcome: Sendable {
     /// The dry-run selection made before any deletion.
-    public let plan: CachePurgePlan
+    package let plan: CachePurgePlan
 
     /// The deletion counts, or `nil` when the operation remained a plan.
-    public let result: CachePurgeResult?
+    package let result: CachePurgeResult?
 
     /// Creates a purge outcome.
-    public init(plan: CachePurgePlan, result: CachePurgeResult?) {
+    package init(plan: CachePurgePlan, result: CachePurgeResult?) {
         self.plan = plan
         self.result = result
     }
@@ -26,7 +26,7 @@ public struct CachePurgeOutcome: Sendable {
 /// owns neither argument parsing nor backend construction: a frontend supplies
 /// the storage capabilities, chooses presentation, and decides whether to
 /// confirm the generated plan.
-public struct CachePurgeRunner: Sendable {
+package struct CachePurgeRunner: Sendable {
     private let service: CachePurgeService
 
     /// Creates a purge runner for one storage domain.
@@ -35,7 +35,7 @@ public struct CachePurgeRunner: Sendable {
     /// `retentionStore`, and `actionCacheStore` (to derive the scope's live
     /// root set from current Action Cache values); age-based staging and
     /// Action Cache requests need only `administration`.
-    public init(
+    package init(
         administration: any CacheAdministration,
         referenceReader: (any CASReferenceReader)? = nil,
         retentionStore: (any CASRetentionStore)? = nil,
@@ -63,7 +63,7 @@ public struct CachePurgeRunner: Sendable {
     ///   - confirm: The explicit destructive-action confirmation.
     /// - Returns: The plan and, when executed, its deletion counts.
     /// - Throws: If the required capabilities or safety evidence are missing.
-    public func run(
+    package func run(
         request: CachePurgeRequest,
         dryRun: Bool,
         confirm: Bool

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Identifies the direction of one cache operation observed by the proxy.
-public enum X8CacheMetricOperation: String, Codable, Sendable {
+package enum X8CacheMetricOperation: String, Codable, Sendable {
     /// A CAS or Action Cache read.
     case get
 
@@ -10,7 +10,7 @@ public enum X8CacheMetricOperation: String, Codable, Sendable {
 }
 
 /// Classifies the result of one cache operation.
-public enum X8CacheMetricOutcome: String, Codable, Sendable {
+package enum X8CacheMetricOutcome: String, Codable, Sendable {
     /// The requested cache record was returned.
     case hit
 
@@ -28,9 +28,9 @@ public enum X8CacheMetricOutcome: String, Codable, Sendable {
 }
 
 /// Renders persisted metrics using stable, script-friendly field names.
-public enum X8CacheMetricsPresentation {
+package enum X8CacheMetricsPresentation {
     /// Returns one `name=value` line for every required cache metric.
-    public static func render(_ snapshot: X8CacheMetricsSnapshot) -> String {
+    package static func render(_ snapshot: X8CacheMetricsSnapshot) -> String {
         [
             "get_requests=\(snapshot.getRequests)",
             "put_requests=\(snapshot.putRequests)",
@@ -54,7 +54,7 @@ public enum X8CacheMetricsPresentation {
 }
 
 /// Receives completed proxy operations and exposes a consistent snapshot.
-public protocol X8CacheMetricsRecorder: Sendable {
+package protocol X8CacheMetricsRecorder: Sendable {
     /// Records one completed operation.
     func record(_ event: X8CacheMetricsEvent) async
 

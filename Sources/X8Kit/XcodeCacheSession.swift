@@ -9,16 +9,16 @@ import X8Storage
 /// an external Xcode client. Its shutdown drains the server and removes the
 /// invocation-specific filesystem state. The caller owns the lifetime of the
 /// external client and must pass `cacheEnvironment` to that client.
-public final class XcodeCacheSession: Sendable {
+package final class XcodeCacheSession: Sendable {
     /// The Unix socket endpoint used by the cache proxy.
-    public let socketPath: String
+    package let socketPath: String
 
     /// The build settings an Xcode client must receive to use the proxy.
     ///
     /// Contains the three `COMPILATION_CACHE_*` settings and, unless the
     /// session was started with ``XcodeCachePrefixMapping/disabled``, six
     /// prefix-mapping settings and an empty module-validation session path.
-    public let cacheEnvironment: [String: String]
+    package let cacheEnvironment: [String: String]
 
     /// Why the events socket was not bound, when it wasn't.
     ///
@@ -26,7 +26,7 @@ public final class XcodeCacheSession: Sendable {
     /// bound successfully. Set when binding was attempted and skipped, most
     /// often because another process already owns that socket for the same
     /// profile. The cache proxy is unaffected either way.
-    public let eventsSocketWarning: String?
+    package let eventsSocketWarning: String?
 
     private let serverSession: XcodeCacheServerSession
     private let runtimeDirectory: XcodeCacheRuntimeDirectory
@@ -64,7 +64,7 @@ public final class XcodeCacheSession: Sendable {
     ///   Xcode client through `cacheEnvironment`.
     /// - Throws: If the runtime directory cannot be created or the cache server
     ///   cannot become ready.
-    public static func start(
+    package static func start(
         casStore: any CASStore,
         actionCacheStore: any ActionCacheStore,
         prefixMapping: XcodeCachePrefixMapping = .enabled,
@@ -94,7 +94,7 @@ public final class XcodeCacheSession: Sendable {
     /// Calling this method more than once is safe. Shutdown errors from the
     /// serving task are intentionally treated as cleanup details by the
     /// underlying session.
-    public func shutdown() async {
+    package func shutdown() async {
         await serverSession.shutdown()
         stopEventsSocket()
         runtimeDirectory.remove()

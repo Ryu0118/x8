@@ -1,37 +1,37 @@
 import Foundation
 
 /// Describes one completed cache operation for metrics aggregation.
-public struct X8CacheMetricsEvent: Sendable {
+package struct X8CacheMetricsEvent: Sendable {
     /// The operation direction.
-    public let operation: X8CacheMetricOperation
+    package let operation: X8CacheMetricOperation
 
     /// The operation outcome.
-    public let outcome: X8CacheMetricOutcome
+    package let outcome: X8CacheMetricOutcome
 
     /// The number of payload bytes transferred, if known.
-    public let byteCount: Int64
+    package let byteCount: Int64
 
     /// The elapsed operation time.
-    public let latency: Duration
+    package let latency: Duration
 
     /// The wire-level RPC name, when the caller has one to report.
     ///
     /// Aggregate consumers such as ``X8CacheMetricsStore`` ignore this field;
     /// it exists for per-event observers such as a live tail.
-    public let rpc: String?
+    package let rpc: String?
 
     /// The opaque CAS or Action Cache key bytes, when the caller has one.
     ///
     /// Kept as raw bytes rather than re-derived: CAS identifiers are opaque
     /// per the project's cache-key contract, so a display surface truncates
     /// these bytes to a hex prefix instead of hashing or reinterpreting them.
-    public let keyBytes: Data?
+    package let keyBytes: Data?
 
     /// When this operation completed.
-    public let timestamp: Date
+    package let timestamp: Date
 
     /// Creates a metrics event.
-    public init(
+    package init(
         operation: X8CacheMetricOperation,
         outcome: X8CacheMetricOutcome,
         byteCount: Int64 = 0,

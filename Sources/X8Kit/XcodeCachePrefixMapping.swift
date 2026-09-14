@@ -9,7 +9,7 @@
 /// shared cache misses on every machine whose paths differ, so `enabled` is
 /// the default for every X8 client. `disabled` exists for a project that sets
 /// these settings itself and must not have them overridden by X8.
-public enum XcodeCachePrefixMapping: Sendable, Equatable {
+package enum XcodeCachePrefixMapping: Sendable, Equatable {
     case enabled
     case disabled
 }

@@ -1,43 +1,43 @@
 /// A serializable snapshot of cache traffic observed by one proxy.
-public struct X8CacheMetricsSnapshot: Codable, Equatable, Sendable {
+package struct X8CacheMetricsSnapshot: Codable, Equatable, Sendable {
     /// The number of read operations.
-    public let getRequests: Int64
+    package let getRequests: Int64
 
     /// The number of write operations.
-    public let putRequests: Int64
+    package let putRequests: Int64
 
     /// The number of successful cache reads.
-    public let cacheHits: Int64
+    package let cacheHits: Int64
 
     /// The number of cache misses.
-    public let cacheMisses: Int64
+    package let cacheMisses: Int64
 
     /// The number of provider or storage errors.
-    public let remoteErrors: Int64
+    package let remoteErrors: Int64
 
     /// The number of records rejected as corrupt.
-    public let corruptedObjects: Int64
+    package let corruptedObjects: Int64
 
     /// The number of bytes returned by reads.
-    public let bytesDownloaded: Int64
+    package let bytesDownloaded: Int64
 
     /// The number of bytes accepted by writes.
-    public let bytesUploaded: Int64
+    package let bytesUploaded: Int64
 
     /// The p50 read latency in milliseconds, or nil when no read occurred.
-    public let getLatencyP50Milliseconds: Double?
+    package let getLatencyP50Milliseconds: Double?
 
     /// The p95 read latency in milliseconds, or nil when no read occurred.
-    public let getLatencyP95Milliseconds: Double?
+    package let getLatencyP95Milliseconds: Double?
 
     /// The p50 write latency in milliseconds, or nil when no write occurred.
-    public let putLatencyP50Milliseconds: Double?
+    package let putLatencyP50Milliseconds: Double?
 
     /// The p95 write latency in milliseconds, or nil when no write occurred.
-    public let putLatencyP95Milliseconds: Double?
+    package let putLatencyP95Milliseconds: Double?
 
     /// Creates a metrics snapshot.
-    public init(
+    package init(
         getRequests: Int64,
         putRequests: Int64,
         cacheHits: Int64,

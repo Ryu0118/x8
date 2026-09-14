@@ -4,35 +4,35 @@ import X8Core
 import X8Storage
 
 /// The proxy portion of the health check used by `x8 doctor`.
-public struct X8DoctorProxyResult: Equatable, Sendable {
+package struct X8DoctorProxyResult: Equatable, Sendable {
     /// The temporary socket used for the check.
-    public let socketPath: String
+    package let socketPath: String
 
     /// The number of unary RPC methods exercised successfully.
-    public let rpcMethodsExercised: Int
+    package let rpcMethodsExercised: Int
 
     /// Creates a proxy health result.
-    public init(socketPath: String, rpcMethodsExercised: Int) {
+    package init(socketPath: String, rpcMethodsExercised: Int) {
         self.socketPath = socketPath
         self.rpcMethodsExercised = rpcMethodsExercised
     }
 }
 
 /// The successful result of the complete `x8 doctor` check.
-public struct X8DoctorResult: Equatable, Sendable {
+package struct X8DoctorResult: Equatable, Sendable {
     /// The local proxy result. A returned value also implies the storage read passed.
-    public let proxy: X8DoctorProxyResult
+    package let proxy: X8DoctorProxyResult
 
     /// Creates a doctor result.
-    public init(proxy: X8DoctorProxyResult) {
+    package init(proxy: X8DoctorProxyResult) {
         self.proxy = proxy
     }
 }
 
 /// Performs backend-neutral checks on X8's local protocol proxy.
-public struct X8Doctor: Sendable {
+package struct X8Doctor: Sendable {
     /// Creates a doctor.
-    public init() {}
+    package init() {}
 
     /// Runs the complete backend-neutral doctor check.
     ///
@@ -48,7 +48,7 @@ public struct X8Doctor: Sendable {
     ///   to have succeeded when this returns.
     /// - Throws: If the proxy cannot start, its protocol probe fails, or the
     ///   storage read fails.
-    public func check(
+    package func check(
         actionCacheStore: any ActionCacheStore,
         fileManager: any FileManagerProtocol = FileManager.default
     ) async throws -> X8DoctorResult {
@@ -66,7 +66,7 @@ public struct X8Doctor: Sendable {
     /// This check does not contact an object store and does not retain the
     /// temporary socket. A frontend may combine its result with a backend
     /// connectivity check appropriate for the selected storage trait.
-    public func checkProxy(
+    package func checkProxy(
         fileManager: any FileManagerProtocol = FileManager.default
     ) async throws -> X8DoctorProxyResult {
         let storage = InMemoryStorage()

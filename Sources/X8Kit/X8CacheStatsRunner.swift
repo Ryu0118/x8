@@ -10,11 +10,11 @@ import Foundation
 /// The snapshot describes remote-cache traffic X8 observed directly. An
 /// Xcode build-system decision such as "up to date" is not a cache hit
 /// unless the proxy also observed the corresponding storage hit.
-public struct X8CacheStatsRunner: Sendable {
+package struct X8CacheStatsRunner: Sendable {
     private let fileManager: any FileManagerProtocolMacOS
 
     /// Creates a stats runner with an injectable filesystem dependency.
-    public init(
+    package init(
         fileManager: any FileManagerProtocolMacOS = FileManager.default
     ) {
         self.fileManager = fileManager
@@ -26,7 +26,7 @@ public struct X8CacheStatsRunner: Sendable {
     /// - Returns: The persisted snapshot, or `nil` when the profile has not
     ///   completed a metrics-bearing session yet.
     /// - Throws: If the snapshot exists but cannot be decoded or read.
-    public func load(profileID: String) async throws -> X8CacheMetricsSnapshot? {
+    package func load(profileID: String) async throws -> X8CacheMetricsSnapshot? {
         let url = XcodeServeRunner.defaultMetricsFileURL(
             profileID: profileID,
             fileManager: fileManager

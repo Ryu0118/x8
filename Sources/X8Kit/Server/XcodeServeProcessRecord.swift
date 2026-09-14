@@ -7,18 +7,18 @@ import Foundation
 /// the same PID. This type only encodes and decodes the record; reading,
 /// writing, and interpreting it against the live process table are the
 /// caller's responsibility.
-public struct XcodeServeProcessRecord: Codable, Sendable, Equatable {
+package struct XcodeServeProcessRecord: Codable, Sendable, Equatable {
     /// The detached process's identifier.
-    public let pid: Int32
+    package let pid: Int32
 
     /// The process's start time, in seconds since the Unix epoch.
-    public let startTime: Double
+    package let startTime: Double
 
     /// The resolved path to the executable the process was spawned from.
-    public let executablePath: String
+    package let executablePath: String
 
     /// Creates a record identifying one detached process.
-    public init(pid: Int32, startTime: Double, executablePath: String) {
+    package init(pid: Int32, startTime: Double, executablePath: String) {
         self.pid = pid
         self.startTime = startTime
         self.executablePath = executablePath

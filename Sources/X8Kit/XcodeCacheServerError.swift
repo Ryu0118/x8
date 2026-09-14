@@ -3,7 +3,7 @@
 /// These cases describe the cache endpoint readiness and ownership boundary.
 /// They are thrown when startup cannot establish a safe endpoint. The error
 /// does not represent an external client process or its exit status.
-public enum XcodeCacheServerError: Error, Equatable, Sendable, CustomStringConvertible {
+package enum XcodeCacheServerError: Error, Equatable, Sendable, CustomStringConvertible {
     /// The cache server did not create its socket before the startup deadline.
     case startupTimedOut(socketPath: String)
 
@@ -14,7 +14,7 @@ public enum XcodeCacheServerError: Error, Equatable, Sendable, CustomStringConve
     case socketPathOccupied(socketPath: String)
 
     /// A human-readable description suitable for CLI diagnostics.
-    public var description: String {
+    package var description: String {
         switch self {
         case let .startupTimedOut(socketPath):
             "The cache server did not become ready at \(socketPath)."

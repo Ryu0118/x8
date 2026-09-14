@@ -9,9 +9,9 @@ import Foundation
 /// a graceful drain and waits for cleanup. `waitForTerminationSignal()` is a
 /// convenience for a foreground process or supervisor that should translate
 /// `SIGINT`/`SIGTERM` into the same graceful shutdown path.
-public final class XcodeServeHandle: Sendable {
+package final class XcodeServeHandle: Sendable {
     /// The Unix socket path exposed to Xcode.
-    public let socketPath: String
+    package let socketPath: String
 
     /// The build settings needed by an Xcode client using this server.
     ///
@@ -20,14 +20,14 @@ public final class XcodeServeHandle: Sendable {
     /// session path, and the optional working-directory mapping selected by
     /// the runner. Computed once at handle creation, since the runner that
     /// constructs a handle has already validated its working directory.
-    public let cacheEnvironment: [String: String]
+    package let cacheEnvironment: [String: String]
 
     /// Explains why the live cache-events socket did not start, if it did not.
     ///
     /// `nil` means the socket is serving connections, or that a caller
     /// disabled it entirely. The events socket is a diagnostic convenience:
     /// its absence never affects cache serving.
-    public let eventsSocketWarning: String?
+    package let eventsSocketWarning: String?
 
     private let session: XcodeCacheServerSession
     private let makeTerminationSignalWaiter: @Sendable () -> any TerminationSignalWaiting
@@ -39,7 +39,7 @@ public final class XcodeServeHandle: Sendable {
     ///
     /// The owned socket is cleaned up when the serving task completes. A
     /// transport failure is rethrown after that cleanup.
-    public func wait() async throws {
+    package func wait() async throws {
         do {
             try await session.wait()
         } catch {
@@ -53,7 +53,7 @@ public final class XcodeServeHandle: Sendable {
     ///
     /// The method is non-throwing because it is a cleanup operation; serving
     /// task failures are observed internally while the endpoint is removed.
-    public func shutdown() async {
+    package func shutdown() async {
         await session.shutdown()
         stopEventsSocket()
     }
@@ -66,7 +66,7 @@ public final class XcodeServeHandle: Sendable {
     ///
     /// - Parameter bufferLimit: The number of most-recent events retained for
     ///   a subscriber that is not keeping up; older events are dropped first.
-    public func subscribeToEvents(bufferLimit: Int = 64) async -> AsyncStream<X8CacheMetricsEvent> {
+    package func subscribeToEvents(bufferLimit: Int = 64) async -> AsyncStream<X8CacheMetricsEvent> {
         await events.subscribe(bufferLimit: bufferLimit)
     }
 
@@ -75,7 +75,7 @@ public final class XcodeServeHandle: Sendable {
     /// A `SIGINT` or `SIGTERM` results in normal completion after draining. A
     /// server failure is rethrown after shutdown. Cancellation of the waiting
     /// task also follows the shutdown path and is propagated to the caller.
-    public func waitForTerminationSignal() async throws {
+    package func waitForTerminationSignal() async throws {
         let waiter = makeTerminationSignalWaiter()
         do {
             try await waitForServerOrTermination(using: waiter)

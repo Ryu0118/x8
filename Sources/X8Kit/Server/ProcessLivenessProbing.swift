@@ -5,7 +5,7 @@
 /// package's dependencies never send or probe process signals. `X8CLI`
 /// supplies the live implementation and injects it wherever this package
 /// needs a liveness answer, such as ``XcodeServeRunner``'s stale-socket check.
-public protocol ProcessLivenessProbing: Sendable {
+package protocol ProcessLivenessProbing: Sendable {
     /// Returns whether `record` still identifies a running process.
     ///
     /// An implementation must also account for PID reuse: a PID that is
@@ -18,12 +18,12 @@ public protocol ProcessLivenessProbing: Sendable {
 /// never reclaims a socket whose pidfile it cannot disprove. A socket with no
 /// pidfile at all is unaffected: it is reclaimed once nothing answers on it,
 /// regardless of which liveness probe is in use.
-public struct AlwaysAliveProcessLivenessProbe: ProcessLivenessProbing {
+package struct AlwaysAliveProcessLivenessProbe: ProcessLivenessProbing {
     /// Creates a probe that reports every record as alive.
-    public init() {}
+    package init() {}
 
     /// Always returns `true`.
-    public func isAlive(_: XcodeServeProcessRecord) -> Bool {
+    package func isAlive(_: XcodeServeProcessRecord) -> Bool {
         true
     }
 }

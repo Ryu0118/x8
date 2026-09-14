@@ -1,7 +1,7 @@
 import Foundation
 
 /// Actor-isolated in-memory aggregation for one X8 proxy lifetime.
-public actor X8CacheMetricsStore: X8CacheMetricsRecorder {
+package actor X8CacheMetricsStore: X8CacheMetricsRecorder {
     private static let maximumLatencySamples = 2048
 
     private var getRequests: Int64 = 0
@@ -16,10 +16,10 @@ public actor X8CacheMetricsStore: X8CacheMetricsRecorder {
     private var putLatencies: [Double] = []
 
     /// Creates an empty metrics store.
-    public init() {}
+    package init() {}
 
     /// Records one operation and bounds retained latency samples.
-    public func record(_ event: X8CacheMetricsEvent) async {
+    package func record(_ event: X8CacheMetricsEvent) async {
         switch event.operation {
         case .get:
             getRequests = increment(getRequests)
@@ -48,7 +48,7 @@ public actor X8CacheMetricsStore: X8CacheMetricsRecorder {
     }
 
     /// Returns a snapshot with percentile calculations isolated to this actor.
-    public func snapshot() async -> X8CacheMetricsSnapshot {
+    package func snapshot() async -> X8CacheMetricsSnapshot {
         X8CacheMetricsSnapshot(
             getRequests: getRequests,
             putRequests: putRequests,

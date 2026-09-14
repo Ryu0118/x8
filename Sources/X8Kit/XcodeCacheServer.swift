@@ -16,9 +16,9 @@ import X8Storage
 /// The server does not own the lifetime or policy of the supplied storage
 /// implementations. Its lifecycle is managed by `XcodeCacheServerSession` or
 /// another caller using the `XcodeCacheServing` boundary.
-public final class XcodeCacheServer: XcodeCacheServing, Sendable {
+package final class XcodeCacheServer: XcodeCacheServing, Sendable {
     /// The socket path owned by this server.
-    public let socketPath: String
+    package let socketPath: String
 
     private let server: GRPCServer<HTTP2ServerTransport.Posix>
     private let responseFileStore: XcodeCacheResponseFileStore
@@ -71,7 +71,7 @@ public final class XcodeCacheServer: XcodeCacheServing, Sendable {
     ///   - metrics: The recorder receiving cache traffic observations.
     ///   - responseDirectory: See `liveFactory(responseDirectory:)`. `nil`
     ///     stages response files next to the socket.
-    public convenience init(
+    package convenience init(
         socketPath: String,
         casStore: any CASStore,
         actionCacheStore: any ActionCacheStore,
@@ -133,7 +133,7 @@ public final class XcodeCacheServer: XcodeCacheServing, Sendable {
     /// The method is long-lived and performs response-file cleanup on every
     /// exit path. The server socket becomes usable during this operation; the
     /// lifecycle coordinator is responsible for waiting until it appears.
-    public func serve() async throws {
+    package func serve() async throws {
         defer { responseFileStore.cleanup() }
         try await server.serve()
     }
@@ -142,7 +142,7 @@ public final class XcodeCacheServer: XcodeCacheServing, Sendable {
     ///
     /// Completion is observed by awaiting `serve()` through the owning session
     /// or handle. Calling this method more than once is safe.
-    public func beginGracefulShutdown() {
+    package func beginGracefulShutdown() {
         server.beginGracefulShutdown()
     }
 }
