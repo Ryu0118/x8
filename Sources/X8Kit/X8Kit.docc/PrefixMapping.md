@@ -113,16 +113,6 @@ cache miss, even though the compiler inputs are otherwise identical. This is
 a known hazard, not something X8's prefix mapping addresses, since prefix
 mapping normalizes paths, not argument ordering.
 
-## Why a compiler-process wrapper cannot substitute for prefix mapping
-
-Xcode's integrated driver performs dependency scanning, serializes dependency
-maps, and computes output cache keys before launching the compiler frontend
-process. A wrapper that intercepts `SWIFT_EXEC` or the frontend executable
-only changes inputs at frontend-launch time, which is after Xcode has already
-computed the cache keys for that job. Such a wrapper therefore cannot make
-Xcode use a different, more portable key; it can at most observe or alter
-frontend behavior for work Xcode has already keyed.
-
 ## Toolchain support
 
 Requires Xcode 27 or later; x8 does not check the Xcode version at runtime.
@@ -133,15 +123,3 @@ consumers could not find them. The Swift 6.4 fix
 registers them under the original path and ships in Xcode 27. The Swift 6.1
 tools version in `Package.swift` describes building X8 itself, not the
 supported Xcode client.
-
-## Why the proxy cannot simply rewrite a key
-
-The checked-in `KeyValueDB.GetValueRequest` contains only an opaque byte key.
-It does not include the compiler arguments or the caller's source roots. CAS
-requests carry opaque objects and references; a lookup does not guarantee
-that the key's complete input graph is already available remotely.
-
-X8 preserves these identifiers. Replacing a hash or guessing an equivalent
-key can return an artifact from a different compiler job. A transparent fix
-must address key construction and output replay at the compiler/client
-boundary, not just rename the S3 record.
