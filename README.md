@@ -144,8 +144,10 @@ project already handles build-path portability itself. See
 
 While a build is running, `x8 tail` (run from another terminal in the same
 project) streams that invocation's cache traffic, the same as it would for
-`x8 serve`. See [Watching live cache traffic](#watching-live-cache-traffic)
-for how the two relate when both are running at once.
+`x8 serve`. `x8 serve` also prints its own live cache traffic inline while it
+runs, so a standalone proxy needs no separate `x8 tail` to watch it. See
+[Watching live cache traffic](#watching-live-cache-traffic) for how the two
+relate when both are running at once.
 
 ### 2. Xcode.app GUI builds
 
@@ -191,6 +193,8 @@ build outputs.
 `x8 tail` connects to a live cache-events socket and prints each cache
 request as it happens. Both `x8 serve` and `x8 xcodebuild` open this socket,
 so `x8 tail` works against either — there is nothing else to configure.
+`x8 serve` streams the same traffic to its own terminal directly, without
+dialing that socket, so it stays visible even if the socket fails to bind.
 
 The socket's identity comes from the *profile ID*, a hash of `.x8.yml`'s
 `version`, `endpoint`, `region`, and `bucket`, not from the directory you run
