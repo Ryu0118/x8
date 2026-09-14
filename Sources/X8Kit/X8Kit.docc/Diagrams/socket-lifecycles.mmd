@@ -7,7 +7,7 @@ flowchart LR
     end
     subgraph B["x8 serve (long-lived)"]
         direction LR
-        B1["XcodeServeRunner.start<br/>or startActivated via launchd"] --> B2["stable socket<br/>Application Support/X8/profileID/listener.sock"]
+        B1["XcodeServeRunner.start"] --> B2["stable socket<br/>Application Support/X8/profileID/listener.sock"]
         B2 --> B3["any number of xcodebuild / Xcode GUI builds<br/>configured with the printed settings"]
         B3 --> B4["SIGINT / SIGTERM or handle.shutdown"]
     end

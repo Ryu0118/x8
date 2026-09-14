@@ -53,12 +53,3 @@ package typealias XcodeCacheServerFactory = @Sendable (
     any ActionCacheStore,
     any FileManagerProtocol
 ) -> any XcodeCacheServing
-
-/// Creates a cache server around a listener already activated by launchd.
-package typealias XcodeCacheActivatedServerFactory = @Sendable (
-    String,
-    Int,
-    any CASStore,
-    any ActionCacheStore,
-    any FileManagerProtocol
-) -> any XcodeCacheServing

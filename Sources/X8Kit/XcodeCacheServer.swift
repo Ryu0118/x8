@@ -51,26 +51,6 @@ public final class XcodeCacheServer: XcodeCacheServing, Sendable {
         }
     }
 
-    /// Builds the live factory for a launchd-owned listening descriptor.
-    ///
-    /// - Parameter responseDirectory: See `liveFactory(responseDirectory:)`.
-    package static func liveActivatedFactory(
-        responseDirectory: URL? = nil,
-        metrics: any X8CacheMetricsRecorder = X8CacheMetricsStore()
-    ) -> XcodeCacheActivatedServerFactory {
-        { socketPath, listeningSocketDescriptor, casStore, actionCacheStore, fileManager in
-            XcodeCacheServer(
-                activatedSocketPath: socketPath,
-                listeningSocketDescriptor: listeningSocketDescriptor,
-                casStore: casStore,
-                actionCacheStore: actionCacheStore,
-                fileManager: fileManager,
-                metrics: metrics,
-                responseDirectory: responseDirectory
-            )
-        }
-    }
-
     /// The metrics recorder shared by the CAS and Action Cache services.
     ///
     /// Declared as the protocol's optional type so this witnesses
@@ -101,34 +81,6 @@ public final class XcodeCacheServer: XcodeCacheServing, Sendable {
     ) {
         let transport = HTTP2ServerTransport.Posix(
             address: .unixDomainSocket(path: socketPath),
-            transportSecurity: .plaintext
-        )
-        self.init(
-            socketPath: socketPath,
-            transport: transport,
-            casStore: casStore,
-            actionCacheStore: actionCacheStore,
-            fileManager: fileManager,
-            metrics: metrics,
-            responseDirectory: responseDirectory
-        )
-    }
-
-    /// Creates a server around a listener that launchd already owns.
-    ///
-    /// X8 does not bind, unlink, or chmod the activated socket. The descriptor
-    /// is transferred to gRPC, which owns and closes it after serving stops.
-    package convenience init(
-        activatedSocketPath socketPath: String,
-        listeningSocketDescriptor: Int,
-        casStore: any CASStore,
-        actionCacheStore: any ActionCacheStore,
-        fileManager: any FileManagerProtocol = FileManager.default,
-        metrics: any X8CacheMetricsRecorder = X8CacheMetricsStore(),
-        responseDirectory: URL? = nil
-    ) {
-        let transport = HTTP2ServerTransport.Posix(
-            listeningSocketDescriptor: listeningSocketDescriptor,
             transportSecurity: .plaintext
         )
         self.init(

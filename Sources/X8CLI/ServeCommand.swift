@@ -19,9 +19,6 @@ struct ServeCommand: X8ExecutableCommand {
     @Flag(name: .long, help: "Print only the socket path and keep serving.")
     var printSocket = false
 
-    @Flag(name: .long, help: "Adopt the listener supplied by launchd.")
-    var launchd = false
-
     @Option(
         name: .long,
         help: "Physical workspace directory to map to /^workspace. Defaults to the current directory."
@@ -38,7 +35,7 @@ struct ServeCommand: X8ExecutableCommand {
                 actionCacheStore: storage.actionCacheStore(role: configuration.role),
                 workingDirectory: Self.workingDirectory(from: workspaceDirectory)
             )
-            let handle = try await Self.start(runner: runner, useLaunchd: launchd)
+            let handle = try await runner.start()
             Self.writeSettings(
                 for: handle,
                 printCacheSettings: printCacheSettings,
@@ -80,15 +77,5 @@ struct ServeCommand: X8ExecutableCommand {
         handle.cacheEnvironment
             .sorted { $0.key < $1.key }
             .forEach { output.standardOutput("\($0.key)=\($0.value)") }
-    }
-
-    private static func start(
-        runner: XcodeServeRunner,
-        useLaunchd: Bool
-    ) async throws -> XcodeServeHandle {
-        if useLaunchd {
-            return try await runner.startActivated()
-        }
-        return try await runner.start()
     }
 }

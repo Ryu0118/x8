@@ -13,10 +13,4 @@ stateDiagram-v2
     Drained --> [*]: socket removed; original error rethrown
     Ready --> Draining: shutdown() or termination signal
     Ready --> Draining: transport failure (wait() rethrows after cleanup)
-    Draining --> [*]: response files removed; socket removed unless launchd owns it
-
-    note right of WaitingForSocket
-        A launchd-activated start skips this state:
-        the descriptor is already bound, and the
-        session never owns the socket node.
-    end note
+    Draining --> [*]: response files removed; socket removed

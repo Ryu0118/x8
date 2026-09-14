@@ -93,39 +93,6 @@ package struct XcodeCacheServerLifecycle: Sendable {
         }
     }
 
-    /// Starts a server using a listener descriptor supplied by launchd.
-    ///
-    /// The descriptor is already bound and ready, so this path never polls for
-    /// or changes the socket node. The returned session deliberately does not
-    /// own endpoint cleanup; launchd owns the socket lifecycle.
-    package func startActivated(
-        runtimeDirectory: XcodeCacheRuntimeDirectory,
-        listeningSocketDescriptor: Int,
-        casStore: any CASStore,
-        actionCacheStore: any ActionCacheStore,
-        serverFactory: @escaping XcodeCacheActivatedServerFactory,
-        metricsFileURL: URL? = nil
-    ) async throws -> XcodeCacheServerSession {
-        let server = serverFactory(
-            runtimeDirectory.socketURL.path,
-            listeningSocketDescriptor,
-            casStore,
-            actionCacheStore,
-            fileManager
-        )
-        let task = Task {
-            try await server.serve()
-        }
-        return XcodeCacheServerSession(
-            server: server,
-            task: task,
-            ownsSocket: false,
-            runtimeDirectory: runtimeDirectory,
-            metricsFileURL: metricsFileURL,
-            fileManager: fileManager
-        )
-    }
-
     private func waitForSocket(
         at path: String,
         state: ServerStartupState

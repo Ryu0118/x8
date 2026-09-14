@@ -4,12 +4,13 @@ import X8Storage
 
 /// Starts a long-lived Xcode cache proxy on a stable Unix socket.
 ///
-/// This runner is the standalone-server entry point for clients such as Xcode
-/// GUI or a launch supervisor. `start()` creates the parent directory, refuses
-/// to replace an existing socket, starts the server, waits for endpoint
-/// readiness, and returns an `XcodeServeHandle`. The handle owns the running
-/// session; the server remains available until the handle is shut down, its
-/// process receives a termination signal, or the transport fails.
+/// This runner is the standalone-server entry point for clients such as
+/// Xcode.app that need a stable socket rather than an invocation-scoped one.
+/// `start()` creates the parent directory, refuses to replace an existing
+/// socket, starts the server, waits for endpoint readiness, and returns an
+/// `XcodeServeHandle`. The handle owns the running session; the server
+/// remains available until the handle is shut down, its process receives a
+/// termination signal, or the transport fails.
 ///
 /// The runner does not install a supervisor or persist cache data itself. The
 /// supplied storage implementations determine where CAS and Action Cache
@@ -19,7 +20,6 @@ public struct XcodeServeRunner: Sendable {
     private let casStore: any CASStore
     private let actionCacheStore: any ActionCacheStore
     private let serverFactory: XcodeCacheServerFactory
-    private let activatedServerFactory: XcodeCacheActivatedServerFactory
     private let serverLifecycle: XcodeCacheServerLifecycle
     private let fileManager: any FileManagerProtocolMacOS
     private let workingDirectory: URL?
@@ -53,7 +53,6 @@ public struct XcodeServeRunner: Sendable {
             casStore: casStore,
             actionCacheStore: actionCacheStore,
             serverFactory: XcodeCacheServer.liveFactory(metrics: events),
-            activatedServerFactory: XcodeCacheServer.liveActivatedFactory(metrics: events),
             workingDirectory: workingDirectory,
             fileManager: fileManager,
             events: events
@@ -66,7 +65,6 @@ public struct XcodeServeRunner: Sendable {
         casStore: any CASStore,
         actionCacheStore: any ActionCacheStore,
         serverFactory: @escaping XcodeCacheServerFactory,
-        activatedServerFactory: @escaping XcodeCacheActivatedServerFactory = XcodeCacheServer.liveActivatedFactory(),
         workingDirectory: URL? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default,
         serverLifecycle: XcodeCacheServerLifecycle? = nil,
@@ -76,7 +74,6 @@ public struct XcodeServeRunner: Sendable {
         self.casStore = casStore
         self.actionCacheStore = actionCacheStore
         self.serverFactory = serverFactory
-        self.activatedServerFactory = activatedServerFactory
         self.workingDirectory = workingDirectory
         self.fileManager = fileManager
         self.events = events
@@ -162,43 +159,6 @@ public struct XcodeServeRunner: Sendable {
             casStore: casStore,
             actionCacheStore: actionCacheStore,
             serverFactory: serverFactory,
-            metricsFileURL: runtimeDirectory.url.appending(path: "metrics.json")
-        )
-        let eventsOutcome = await X8CacheEventsListener(broadcaster: events)
-            .start(at: runtimeDirectory.eventsSocketURL.path)
-        return try XcodeServeHandle(
-            session: session,
-            workingDirectory: workingDirectory,
-            eventsListenerOutcome: eventsOutcome,
-            eventsSocketCleanup: { runtimeDirectory.removeEventsSocket() }
-        )
-    }
-
-    /// Adopts one launchd socket and starts the long-lived cache server.
-    ///
-    /// launchd has already created and bound the socket before this method is
-    /// called. X8 only prepares the parent directory and passes the descriptor
-    /// to gRPC; it never replaces or removes the launchd-owned socket node.
-    ///
-    /// - Parameter socketName: The key in the LaunchAgent's `Sockets` dictionary.
-    /// - Returns: A handle for the launchd-backed serving session.
-    /// - Throws: If launchd cannot provide the named listener or the server
-    ///   cannot be constructed.
-    public func startActivated(socketName: String = "Listener") async throws -> XcodeServeHandle {
-        try XcodeCacheEnvironment.validate(workingDirectory: workingDirectory)
-        let descriptor = try await X8LaunchdSocketActivation(socketName: socketName).activate()
-        let socketURL = URL(filePath: socketPath)
-        let runtimeDirectory = XcodeCacheRuntimeDirectory(
-            url: socketURL.deletingLastPathComponent(),
-            fileManager: fileManager
-        )
-        try runtimeDirectory.create(withIntermediateDirectories: true)
-        let session = try await serverLifecycle.startActivated(
-            runtimeDirectory: runtimeDirectory,
-            listeningSocketDescriptor: descriptor,
-            casStore: casStore,
-            actionCacheStore: actionCacheStore,
-            serverFactory: activatedServerFactory,
             metricsFileURL: runtimeDirectory.url.appending(path: "metrics.json")
         )
         let eventsOutcome = await X8CacheEventsListener(broadcaster: events)

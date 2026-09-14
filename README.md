@@ -194,15 +194,6 @@ socket to connect to, then build from Xcode.app as usual. Use the same
 logical `/^workspace` replacement on every machine; neither mode relocates
 build outputs.
 
-For unattended startup and crash recovery, run `x8 serve --launchd` under a
-LaunchAgent instead of leaving a plain `x8 serve` in a terminal. That mode
-is launchd-specific: x8 adopts the listening socket via launchd's socket
-activation rather than binding it itself, so it only works when launchd
-started the process, and there is no `x8 stop` — launchd owns the
-lifecycle. The [Launchd guide](https://ryu0118.github.io/x8/documentation/x8kit/launchd)
-has the LaunchAgent template and the `launchctl` commands to start, stop,
-restart, and diagnose the service.
-
 ## Watching live cache traffic
 
 `x8 tail` connects to a live cache-events socket and prints each cache
@@ -318,9 +309,6 @@ Full API documentation is published at
   explains how build paths are made portable across machines, the toolchain
   requirement, and the known limitations. Read it when cache hits are lower
   than expected or a build shape doesn't seem to cache.
-- [Launchd](https://ryu0118.github.io/x8/documentation/x8kit/launchd) covers
-  running `x8 serve` as a LaunchAgent for Xcode.app builds. Read it if you
-  build from Xcode.app rather than `x8 xcodebuild`.
 - [Creating a custom CLI](https://ryu0118.github.io/x8/documentation/x8cli/creatingacustomcli/)
   walks through building an executable on another storage backend. Read it
   only if you need a non-S3 backend.

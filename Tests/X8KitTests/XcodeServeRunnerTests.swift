@@ -88,36 +88,6 @@ struct XcodeServeRunnerTests {
     }
 
     @Test
-    func activatedSessionLeavesSupervisorOwnedSocketInPlace() async throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appending(path: "x8-serve-test-\(UUID().uuidString)", directoryHint: .isDirectory)
-        let socket = directory.appending(path: "cache.sock")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-
-        let runtimeDirectory = XcodeCacheRuntimeDirectory(
-            url: directory,
-            fileManager: FileManager.default
-        )
-        let storage = InMemoryStorage()
-        let lifecycle = XcodeCacheServerLifecycle()
-        let session = try await lifecycle.startActivated(
-            runtimeDirectory: runtimeDirectory,
-            listeningSocketDescriptor: 123,
-            casStore: storage,
-            actionCacheStore: storage,
-            serverFactory: { socketPath, _, _, _, _ in
-                TestCacheServer(socketPath: socketPath)
-            }
-        )
-        let handle = try XcodeServeHandle(session: session)
-
-        await handle.shutdown()
-
-        #expect(FileManager.default.fileExists(atPath: socket.path))
-    }
-
-    @Test
     func terminationSignalWaitUsesInjectedWaiterAndShutsDown() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "x8-serve-test-\(UUID().uuidString)", directoryHint: .isDirectory)

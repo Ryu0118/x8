@@ -163,7 +163,7 @@ for how long. <doc:XcodeCacheRuntime> describes the lifecycle mechanics.
 | --- | --- | --- |
 | Socket | Throwaway, per invocation | Stable, per profile; existing path is refused, never unlinked |
 | Settings | Injected by X8 as command-line overrides | Printed by `--print-cache-settings`; the client applies them |
-| Typical client | CI job, scripted build | Xcode GUI, repeated local builds, launchd-supervised agent |
+| Typical client | CI job, scripted build | Xcode GUI, repeated local builds |
 | Lifetime | Ends with the child process | Ends on signal, `shutdown()`, or transport failure |
 
 The socket path is only an endpoint. Cache sharing and isolation come from
