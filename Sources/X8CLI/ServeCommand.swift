@@ -52,6 +52,8 @@ struct ServeCommand: X8ExecutableCommand {
                     metadata: .color(.yellow)
                 )
             }
+            let streamingTask = Self.streamEvents(from: handle, output: context.output)
+            defer { streamingTask.cancel() }
             try await handle.waitForTerminationSignal()
         }
     }
@@ -61,6 +63,19 @@ struct ServeCommand: X8ExecutableCommand {
             filePath: path ?? FileManager.default.currentDirectoryPath,
             directoryHint: .isDirectory
         )
+    }
+
+    /// Streams live cache events to `output`, the same rendering `x8 tail` uses.
+    ///
+    /// Subscribes in-process through the handle's broadcaster rather than
+    /// dialing the events socket, so this works even when that socket failed
+    /// to start.
+    private static func streamEvents(from handle: XcodeServeHandle, output: X8CLIOutput) -> Task<Void, Never> {
+        Task {
+            for await event in await handle.subscribeToEvents() {
+                output.standardOutput(TailLineFormatter.render(X8CacheEventLine.line(for: event)))
+            }
+        }
     }
 
     private static func writeSettings(

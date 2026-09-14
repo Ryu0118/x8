@@ -33,6 +33,7 @@ public final class XcodeServeHandle: Sendable {
     private let makeTerminationSignalWaiter: @Sendable () -> any TerminationSignalWaiting
     private let eventsTask: Task<Void, Never>?
     private let eventsSocketCleanup: @Sendable () -> Void
+    private let events: X8CacheEventBroadcaster
 
     /// Waits until the server stops or its transport fails.
     ///
@@ -55,6 +56,18 @@ public final class XcodeServeHandle: Sendable {
     public func shutdown() async {
         await session.shutdown()
         stopEventsSocket()
+    }
+
+    /// Subscribes to this server's live cache events in-process.
+    ///
+    /// Unlike the events socket that ``x8 tail`` dials, this delivers events
+    /// directly from the broadcaster the server already records through, so
+    /// it works whether or not the events socket started.
+    ///
+    /// - Parameter bufferLimit: The number of most-recent events retained for
+    ///   a subscriber that is not keeping up; older events are dropped first.
+    public func subscribeToEvents(bufferLimit: Int = 64) async -> AsyncStream<X8CacheMetricsEvent> {
+        await events.subscribe(bufferLimit: bufferLimit)
     }
 
     /// Waits for a termination signal or server failure, then shuts down gracefully.
@@ -86,6 +99,7 @@ public final class XcodeServeHandle: Sendable {
     ///   one.
     package init(
         session: XcodeCacheServerSession,
+        events: X8CacheEventBroadcaster = X8CacheEventBroadcaster(wrapping: X8CacheMetricsStore()),
         workingDirectory: URL? = nil,
         makeTerminationSignalWaiter: @escaping @Sendable () -> any TerminationSignalWaiting = {
             TerminationSignalWaiter()
@@ -94,6 +108,7 @@ public final class XcodeServeHandle: Sendable {
         eventsSocketCleanup: @escaping @Sendable () -> Void = {}
     ) throws {
         self.session = session
+        self.events = events
         self.makeTerminationSignalWaiter = makeTerminationSignalWaiter
         self.eventsSocketCleanup = eventsSocketCleanup
         socketPath = session.socketPath

@@ -165,6 +165,7 @@ public struct XcodeServeRunner: Sendable {
             .start(at: runtimeDirectory.eventsSocketURL.path)
         return try XcodeServeHandle(
             session: session,
+            events: events,
             workingDirectory: workingDirectory,
             eventsListenerOutcome: eventsOutcome,
             eventsSocketCleanup: { runtimeDirectory.removeEventsSocket() }
