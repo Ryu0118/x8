@@ -23,6 +23,7 @@ struct X8RootCommand: ParsableCommand {
             TailCommand.self,
             StatsCommand.self,
             DoctorCommand.self,
+            LaunchdCommand.self,
         ],
         defaultSubcommand: XcodeBuildCommand.self
     )

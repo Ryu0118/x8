@@ -5,9 +5,7 @@ import Testing
 @Suite("Launchd LaunchAgent planning")
 struct X8LaunchdAgentTests {
     private static func makeAgent(
-        profileID: String = "myproject",
-        workspaceDirectory: URL? = nil,
-        environment: [X8LaunchdAgent.EnvironmentPair] = []
+        profileID: String = "myproject"
     ) -> (agent: X8LaunchdAgent, home: URL, applicationSupport: URL) {
         let home = URL(filePath: "/Users/tester", directoryHint: .isDirectory)
         let applicationSupport = home.appending(path: "Library/Application Support", directoryHint: .isDirectory)
@@ -15,15 +13,21 @@ struct X8LaunchdAgentTests {
             applicationSupportDirectory: applicationSupport,
             homeDirectory: home
         )
-        let agent = X8LaunchdAgent(
-            profileID: profileID,
+        let agent = X8LaunchdAgent(profileID: profileID, fileManager: fileManager)
+        return (agent, home, applicationSupport)
+    }
+
+    private static func makeInstallPlan(
+        agent: X8LaunchdAgent,
+        workspaceDirectory: URL? = nil,
+        environment: [X8LaunchdAgent.EnvironmentPair] = []
+    ) throws -> X8LaunchdAgent.InstallPlan {
+        try agent.installPlan(
             executablePath: "/opt/homebrew/bin/x8",
             workingDirectory: URL(filePath: "/Users/tester/src/myproject", directoryHint: .isDirectory),
             workspaceDirectory: workspaceDirectory,
-            environment: environment,
-            fileManager: fileManager
+            environment: environment
         )
-        return (agent, home, applicationSupport)
     }
 
     @Test
@@ -76,10 +80,23 @@ struct X8LaunchdAgentTests {
     }
 
     @Test
+    func identityNeedsNoInstallOnlyInformation() {
+        // uninstall and status only need label/socketPath/serviceTarget/launchctl
+        // arguments, none of which an install-specific detail should gate.
+        let (agent, _, _) = Self.makeAgent(profileID: "myproject")
+        _ = agent.label
+        _ = agent.socketPath
+        _ = agent.serviceTarget(uid: 501)
+        _ = agent.bootoutArguments(uid: 501)
+        _ = agent.printArguments(uid: 501)
+    }
+
+    @Test
     func plistEncodesTheListenerAtTheDefaultSocketPath() throws {
         let (agent, _, _) = Self.makeAgent(profileID: "myproject")
+        let plan = try Self.makeInstallPlan(agent: agent)
         let plist = try PropertyListSerialization.propertyList(
-            from: agent.plistData(),
+            from: plan.plistData,
             format: nil
         ) as? [String: Any]
         let plistDocument = try #require(plist)
@@ -98,8 +115,9 @@ struct X8LaunchdAgentTests {
     @Test
     func programArgumentsCarryLaunchdAndSuppressPrintingByDefault() throws {
         let (agent, _, _) = Self.makeAgent(profileID: "myproject")
+        let plan = try Self.makeInstallPlan(agent: agent)
         let plist = try PropertyListSerialization.propertyList(
-            from: agent.plistData(),
+            from: plan.plistData,
             format: nil
         ) as? [String: Any]
         let arguments = try #require(plist?["ProgramArguments"] as? [String])
@@ -109,10 +127,11 @@ struct X8LaunchdAgentTests {
 
     @Test
     func workspaceDirectoryIsForwardedWhenGiven() throws {
+        let (agent, _, _) = Self.makeAgent(profileID: "myproject")
         let workspace = URL(filePath: "/Volumes/Data/workspace", directoryHint: .isDirectory)
-        let (agent, _, _) = Self.makeAgent(profileID: "myproject", workspaceDirectory: workspace)
+        let plan = try Self.makeInstallPlan(agent: agent, workspaceDirectory: workspace)
         let plist = try PropertyListSerialization.propertyList(
-            from: agent.plistData(),
+            from: plan.plistData,
             format: nil
         ) as? [String: Any]
         let arguments = try #require(plist?["ProgramArguments"] as? [String])
@@ -123,12 +142,13 @@ struct X8LaunchdAgentTests {
 
     @Test
     func environmentAlwaysIncludesAMinimalPathEvenWhenCustomPairsAreGiven() throws {
-        let (agent, _, _) = Self.makeAgent(
-            profileID: "myproject",
+        let (agent, _, _) = Self.makeAgent(profileID: "myproject")
+        let plan = try Self.makeInstallPlan(
+            agent: agent,
             environment: [.init(key: "AWS_PROFILE", value: "default")]
         )
         let plist = try PropertyListSerialization.propertyList(
-            from: agent.plistData(),
+            from: plan.plistData,
             format: nil
         ) as? [String: Any]
         let environmentVariables = try #require(plist?["EnvironmentVariables"] as? [String: String])

@@ -1,13 +1,13 @@
 import FileManagerProtocol
 import Foundation
 
-/// A launchd `Sockets`-activated LaunchAgent for one X8 serve profile.
+/// A launchd `Sockets`-activated LaunchAgent's identity for one X8 serve profile.
 ///
-/// The `Sockets.Listener` path is always ``XcodeServeRunner/defaultSocketPath(profileID:)``,
-/// so the plist's endpoint and the path `x8 serve` prints as
-/// `COMPILATION_CACHE_REMOTE_SERVICE_PATH` can never drift apart. Callers
-/// that hand-authored a LaunchAgent before this type existed must not point
-/// `SockPathName` anywhere else.
+/// The `Sockets.Listener` path in ``installPlan(executablePath:workingDirectory:workspaceDirectory:environment:)``
+/// is always ``XcodeServeRunner/defaultSocketPath(profileID:)``, so the plist's endpoint
+/// and the path `x8 serve` prints as `COMPILATION_CACHE_REMOTE_SERVICE_PATH` can never
+/// drift apart. Callers that hand-authored a LaunchAgent before this type existed must
+/// not point `SockPathName` anywhere else.
 public struct X8LaunchdAgent: Sendable {
     /// One `KEY=VALUE` environment pair for the LaunchAgent's `EnvironmentVariables`.
     public struct EnvironmentPair: Sendable, Equatable {
@@ -23,38 +23,26 @@ public struct X8LaunchdAgent: Sendable {
         }
     }
 
+    /// What an install needs beyond this agent's identity: where `x8` lives, the
+    /// directory containing `.x8.yml`, and everything else the plist template varies.
+    public struct InstallPlan: Sendable {
+        /// The encoded plist document, ready to write to ``X8LaunchdAgent/plistURL``.
+        public let plistData: Data
+    }
+
     private let profileID: String
-    private let executablePath: String
-    private let workingDirectory: URL
-    private let workspaceDirectory: URL?
-    private let environment: [EnvironmentPair]
     private let fileManager: any FileManagerProtocolMacOS
 
-    /// Creates a planner for one profile's LaunchAgent.
+    /// Creates an identity for one profile's LaunchAgent.
     ///
     /// - Parameters:
     ///   - profileID: The storage profile whose stable socket path this agent serves.
-    ///   - executablePath: The absolute path to the `x8` binary `ProgramArguments[0]` runs.
-    ///   - workingDirectory: The directory containing `.x8.yml`, used as the LaunchAgent's
-    ///     `WorkingDirectory`.
-    ///   - workspaceDirectory: Forwarded as `x8 serve`'s `--workspace-directory`, when the
-    ///     Xcode workspace root differs from `workingDirectory`.
-    ///   - environment: Extra `EnvironmentVariables` entries, such as `AWS_PROFILE`; never
-    ///     captured automatically from the caller's process environment.
     ///   - fileManager: Filesystem dependency used to resolve well-known directories.
     public init(
         profileID: String,
-        executablePath: String,
-        workingDirectory: URL,
-        workspaceDirectory: URL? = nil,
-        environment: [EnvironmentPair] = [],
         fileManager: any FileManagerProtocolMacOS = FileManager.default
     ) {
         self.profileID = profileID
-        self.executablePath = executablePath
-        self.workingDirectory = workingDirectory
-        self.workspaceDirectory = workspaceDirectory
-        self.environment = environment
         self.fileManager = fileManager
     }
 
@@ -80,22 +68,6 @@ public struct X8LaunchdAgent: Sendable {
         "gui/\(uid)/\(label)"
     }
 
-    /// Directories that must exist before the plist is written or bootstrapped.
-    public var requiredDirectories: [URL] {
-        [
-            plistURL.deletingLastPathComponent(),
-            URL(filePath: socketPath).deletingLastPathComponent(),
-            logDirectory,
-        ]
-    }
-
-    /// The encoded plist document, ready to write to ``plistURL``.
-    public func plistData() throws -> Data {
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .xml
-        return try encoder.encode(document)
-    }
-
     /// `launchctl bootstrap gui/<uid> <plistURL>` arguments, excluding `launchctl` itself.
     public func bootstrapArguments(uid: UInt32) -> [String] {
         ["bootstrap", "gui/\(uid)", plistURL.path]
@@ -116,22 +88,38 @@ public struct X8LaunchdAgent: Sendable {
         ["print", serviceTarget(uid: uid)]
     }
 
-    private var logDirectory: URL {
-        fileManager.homeDirectoryForCurrentUser.appending(path: "Library/Logs/X8")
+    /// Directories that must exist before the plist is written or bootstrapped.
+    public var requiredDirectories: [URL] {
+        [
+            plistURL.deletingLastPathComponent(),
+            URL(filePath: socketPath).deletingLastPathComponent(),
+            logDirectory,
+        ]
     }
 
-    private var programArguments: [String] {
+    /// Plans the plist an install writes to ``plistURL``.
+    ///
+    /// - Parameters:
+    ///   - executablePath: The absolute path to the `x8` binary `ProgramArguments[0]` runs.
+    ///   - workingDirectory: The directory containing `.x8.yml`, used as the LaunchAgent's
+    ///     `WorkingDirectory`.
+    ///   - workspaceDirectory: Forwarded as `x8 serve`'s `--workspace-directory`, when the
+    ///     Xcode workspace root differs from `workingDirectory`.
+    ///   - environment: Extra `EnvironmentVariables` entries, such as `AWS_PROFILE`; never
+    ///     captured automatically from the caller's process environment.
+    public func installPlan(
+        executablePath: String,
+        workingDirectory: URL,
+        workspaceDirectory: URL? = nil,
+        environment: [EnvironmentPair] = []
+    ) throws -> InstallPlan {
         var arguments = [executablePath, "serve", "--launchd", "--no-print-cache-settings"]
         if let workspaceDirectory {
             arguments += ["--workspace-directory", workspaceDirectory.path]
         }
-        return arguments
-    }
-
-    private var document: X8LaunchdPlistDocument {
-        X8LaunchdPlistDocument(
+        let document = X8LaunchdPlistDocument(
             label: label,
-            programArguments: programArguments,
+            programArguments: arguments,
             workingDirectory: workingDirectory.path,
             socketPathName: socketPath,
             standardOutPath: logDirectory.appending(path: "\(label).out.log").path,
@@ -139,6 +127,13 @@ public struct X8LaunchdAgent: Sendable {
             environmentVariables: [EnvironmentPair(key: "PATH", value: "/usr/bin:/bin:/usr/sbin:/sbin")]
                 + environment
         )
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .xml
+        return try InstallPlan(plistData: encoder.encode(document))
+    }
+
+    private var logDirectory: URL {
+        fileManager.homeDirectoryForCurrentUser.appending(path: "Library/Logs/X8")
     }
 }
 
