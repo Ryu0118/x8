@@ -136,19 +136,11 @@ Xcode.app), as the first argument; everything after it is forwarded to that
 executable unchanged. x8 preserves the caller's build arguments and chosen
 directories.
 
-x8 also makes the build portable across machines through *prefix mapping*:
-compiled output normally embeds absolute paths such as
-`/Users/you/src/MyApp`, which differ on every machine and would prevent a
-module built on your Mac from being a cache hit on another machine. Prefix mapping replaces
-those paths with stable placeholders before they reach the cache. Concretely,
-x8 injects the cache connection and prefix-mapping settings as
-`SETTING=VALUE` overrides, mapping the working directory to the shared
-`/^workspace` logical prefix. It does not inject or replace
-`-derivedDataPath`, `-clonedSourcePackagesDirPath`, or build-output
-settings. Pass `--no-prefix-mapping` (before the child `xcodebuild`
-argument) if your project sets these portability settings itself. See
-[Prefix mapping](Sources/X8Kit/X8Kit.docc/PrefixMapping.md) for what each
-setting does and which build shapes it cannot make portable.
+x8 also makes the build portable across machines through *prefix mapping*,
+so a module built on your Mac can still be a cache hit on another machine.
+Pass `--no-prefix-mapping` (before the child `xcodebuild` argument) if your
+project already handles build-path portability itself. See
+[Prefix mapping](Sources/X8Kit/X8Kit.docc/PrefixMapping.md) for details.
 
 While a build is running, `x8 tail` (run from another terminal in the same
 project) streams that invocation's cache traffic, the same as it would for
