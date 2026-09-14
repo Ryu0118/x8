@@ -47,9 +47,8 @@ package struct XcodeCacheServerLifecycle: Sendable {
     ///   - casStore: The provider-neutral CAS implementation served by the server.
     ///   - actionCacheStore: The provider-neutral Action Cache implementation.
     ///   - serverFactory: The factory that creates the configured server.
-    ///   - ownsPIDFile: Whether the caller already claimed this runtime
-    ///     directory's pidfile, so the returned session removes it alongside
-    ///     the socket on shutdown.
+    ///   - pidFileLease: The caller's already-claimed pidfile lock, if any, so
+    ///     the returned session releases it alongside the socket on shutdown.
     /// - Returns: A session that owns the ready server task and socket cleanup.
     /// - Throws: A startup, filesystem, cancellation, or server error. Any
     ///   server started before the error is drained and cleaned up first.
@@ -59,7 +58,7 @@ package struct XcodeCacheServerLifecycle: Sendable {
         actionCacheStore: any ActionCacheStore,
         serverFactory: @escaping XcodeCacheServerFactory,
         metricsFileURL: URL? = nil,
-        ownsPIDFile: Bool = false
+        pidFileLease: PIDFileLease? = nil
     ) async throws -> XcodeCacheServerSession {
         let socketPath = runtimeDirectory.socketURL.path
         let server = serverFactory(socketPath, casStore, actionCacheStore, fileManager)
@@ -86,7 +85,7 @@ package struct XcodeCacheServerLifecycle: Sendable {
                 task: task,
                 runtimeDirectory: runtimeDirectory,
                 metricsFileURL: metricsFileURL,
-                ownsPIDFile: ownsPIDFile,
+                pidFileLease: pidFileLease,
                 fileManager: fileManager
             )
         } catch {
@@ -94,6 +93,7 @@ package struct XcodeCacheServerLifecycle: Sendable {
             server.beginGracefulShutdown()
             _ = await task.result
             runtimeDirectory.removeSocket()
+            pidFileLease?.release()
             throw error
         }
     }

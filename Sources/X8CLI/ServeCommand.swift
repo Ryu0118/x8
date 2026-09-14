@@ -90,7 +90,7 @@ struct ServeCommand: X8ExecutableCommand {
     ///
     /// The child claims its own pidfile through `XcodeServeRunner`, using its
     /// own process record, rather than the parent pre-writing one — see
-    /// `XcodeServeRunner.claimPIDFile` for why this ordering is load-bearing.
+    /// `XcodeServeRunner.claimPIDFileLease` for why this ordering is load-bearing.
     /// Standard output here is the redirected `serve.log`, so this path prints
     /// nothing beyond what a foreground run would already log.
     private func runChild(context: X8CommandContext, readyFileDescriptor: Int32) async throws {
@@ -104,7 +104,6 @@ struct ServeCommand: X8ExecutableCommand {
                 casStore: storage.casStore(role: configuration.role),
                 actionCacheStore: storage.actionCacheStore(role: configuration.role),
                 workingDirectory: Self.workingDirectory(from: workspaceDirectory),
-                livenessProbe: LiveProcessLivenessProbe(),
                 processRecord: processRecord
             )
             let handle = try await runner.start()

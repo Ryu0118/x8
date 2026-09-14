@@ -24,7 +24,6 @@ package struct XcodeServeRunner: Sendable {
     private let fileManager: any FileManagerProtocolMacOS
     private let workingDirectory: URL?
     private let events: X8CacheEventBroadcaster
-    private let livenessProbe: any ProcessLivenessProbing
     private let processRecord: XcodeServeProcessRecord?
 
     /// Creates a standalone runner for one stable socket endpoint.
@@ -41,13 +40,6 @@ package struct XcodeServeRunner: Sendable {
     ///   - metrics: The recorder receiving cache traffic observations. Every
     ///     event also becomes available to ``startEventsSocket(profileID:)``,
     ///     regardless of whether that socket is ever started.
-    ///   - livenessProbe: Determines whether a PID recorded in a stale-looking
-    ///     socket's pidfile is still running. Defaults to treating every
-    ///     recorded process as alive, so a caller without a liveness check
-    ///     never reclaims a socket whose pidfile it cannot disprove — a
-    ///     socket with no pidfile at all is still reclaimed once nothing
-    ///     answers on it. A frontend that can check process liveness should
-    ///     inject its live implementation here.
     ///   - processRecord: Identifies the process starting this server, so its
     ///     pidfile can be claimed before binding and removed on shutdown.
     ///     `nil` (the default) skips the pidfile entirely, for a caller such
@@ -60,7 +52,6 @@ package struct XcodeServeRunner: Sendable {
         workingDirectory: URL? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default,
         metrics: any X8CacheMetricsRecorder = X8CacheMetricsStore(),
-        livenessProbe: any ProcessLivenessProbing = AlwaysAliveProcessLivenessProbe(),
         processRecord: XcodeServeProcessRecord? = nil
     ) {
         let events = X8CacheEventBroadcaster(wrapping: metrics)
@@ -72,7 +63,6 @@ package struct XcodeServeRunner: Sendable {
             workingDirectory: workingDirectory,
             fileManager: fileManager,
             events: events,
-            livenessProbe: livenessProbe,
             processRecord: processRecord
         )
     }
@@ -87,7 +77,6 @@ package struct XcodeServeRunner: Sendable {
         fileManager: any FileManagerProtocolMacOS = FileManager.default,
         serverLifecycle: XcodeCacheServerLifecycle? = nil,
         events: X8CacheEventBroadcaster = X8CacheEventBroadcaster(wrapping: X8CacheMetricsStore()),
-        livenessProbe: any ProcessLivenessProbing = AlwaysAliveProcessLivenessProbe(),
         processRecord: XcodeServeProcessRecord? = nil
     ) {
         self.socketPath = socketPath
@@ -97,7 +86,6 @@ package struct XcodeServeRunner: Sendable {
         self.workingDirectory = workingDirectory
         self.fileManager = fileManager
         self.events = events
-        self.livenessProbe = livenessProbe
         self.processRecord = processRecord
         self.serverLifecycle = serverLifecycle ?? XcodeCacheServerLifecycle(
             fileManager: fileManager
@@ -185,19 +173,34 @@ package struct XcodeServeRunner: Sendable {
             .appending(path: XcodeCacheRuntimeDirectory.logFileName)
     }
 
+    /// Reads and decodes a detached server's process record, if its pidfile exists and parses.
+    ///
+    /// The single decoding path a stop command and this runner's own startup
+    /// checks would otherwise each reimplement.
+    package static func readProcessRecord(
+        at url: URL,
+        fileManager: any FileManagerProtocolMacOS = FileManager.default
+    ) -> XcodeServeProcessRecord? {
+        guard let data = fileManager.contents(atPath: url.path) else { return nil }
+        return try? JSONDecoder().decode(XcodeServeProcessRecord.self, from: data)
+    }
+
     /// Starts the server and returns once its socket endpoint is ready.
     ///
-    /// An existing path is rejected when it still looks live — answering a
-    /// connection, or naming a pidfile whose process the injected
-    /// ``ProcessLivenessProbing`` confirms alive — since it may belong to
-    /// another running server. A path with no answering listener and no
-    /// confirmed-live pidfile is stale and reclaimed automatically. The
-    /// returned handle must be retained to keep the serving session under
-    /// caller ownership.
+    /// A caller with a `processRecord` claims its pidfile lock first: the
+    /// kernel releases that lock the instant a prior holder exits for any
+    /// reason, so a claimable lock is itself proof the path is stale,
+    /// without probing or interpreting the previous holder's PID. An existing
+    /// socket is rejected only when something actually answers on it, since
+    /// that alone can only mean a running server; otherwise it is unlinked as
+    /// leftover from whichever process (if any) is confirmed gone by the lock
+    /// having been claimable. The returned handle must be retained to keep
+    /// the serving session under caller ownership.
     ///
     /// - Returns: A handle for observing or stopping the running server.
-    /// - Throws: If the endpoint is occupied, its directory cannot be prepared,
-    ///   or the server fails before readiness.
+    /// - Throws: If the endpoint or its pidfile is held by a live process,
+    ///   the runtime directory cannot be prepared, or the server fails
+    ///   before readiness.
     package func start() async throws -> XcodeServeHandle {
         try XcodeCacheEnvironment.validate(workingDirectory: workingDirectory)
         let socketURL = URL(filePath: socketPath)
@@ -207,17 +210,26 @@ package struct XcodeServeRunner: Sendable {
             fileManager: fileManager
         )
         try runtimeDirectory.create(withIntermediateDirectories: true)
-        try await prepareSocketPath(runtimeDirectory: runtimeDirectory)
-        if let processRecord {
-            try claimPIDFile(runtimeDirectory: runtimeDirectory, record: processRecord)
+
+        let pidFileLease = try claimPIDFileLease(runtimeDirectory: runtimeDirectory)
+        do {
+            try await prepareSocketPath()
+        } catch {
+            pidFileLease?.release()
+            throw error
         }
+
+        // `serverLifecycle.start` releases the lease itself on any failure
+        // along its own path, since ownership only transfers to the session
+        // it returns; a failure here must not release a lease the session
+        // now owns.
         let session = try await serverLifecycle.start(
             runtimeDirectory: runtimeDirectory,
             casStore: casStore,
             actionCacheStore: actionCacheStore,
             serverFactory: serverFactory,
             metricsFileURL: runtimeDirectory.url.appending(path: "metrics.json"),
-            ownsPIDFile: processRecord != nil
+            pidFileLease: pidFileLease
         )
         let eventsOutcome = await X8CacheEventsListener(broadcaster: events)
             .start(at: runtimeDirectory.eventsSocketURL.path)
@@ -230,78 +242,29 @@ package struct XcodeServeRunner: Sendable {
         )
     }
 
-    /// Reclaims a stale socket file, or rejects the path if it still looks live.
-    ///
-    /// A path already answering as a live listener is left untouched — the
-    /// connection probe alone settles that, regardless of a pidfile's
-    /// content or absence, since a listener that answers can only belong to a
-    /// running process. Only when nothing answers does the pidfile matter: an
-    /// absent, unreadable, or dead-process pidfile marks the socket stale and
-    /// safe to unlink, while a pidfile whose process is confirmed alive
-    /// still refuses the path.
-    private func prepareSocketPath(runtimeDirectory: XcodeCacheRuntimeDirectory) async throws {
-        guard fileManager.fileExists(atPath: socketPath) else { return }
-        guard await !XcodeCacheSocketProbe.isListening(at: socketPath) else {
+    /// Claims `processRecord`'s pidfile lock, or throws if it is already held.
+    private func claimPIDFileLease(runtimeDirectory: XcodeCacheRuntimeDirectory) throws -> PIDFileLease? {
+        guard let processRecord else { return nil }
+        guard let lease = try PIDFileLease.claim(at: runtimeDirectory.pidFileURL, record: processRecord) else {
             throw XcodeCacheServerError.socketPathOccupied(socketPath: socketPath)
         }
-        if let record = readProcessRecord(at: runtimeDirectory.pidFileURL), livenessProbe.isAlive(record) {
+        return lease
+    }
+
+    /// Reclaims a stale socket file, or rejects the path if it still looks live.
+    ///
+    /// A path already answering as a live listener is left untouched, since a
+    /// listener that answers can only belong to a running process. Any other
+    /// existing file is stale — a caller with a `processRecord` only reaches
+    /// this point after confirming no prior holder's pidfile lock is still
+    /// claimed, which is the only liveness signal that matters here.
+    private func prepareSocketPath() async throws {
+        guard fileManager.fileExists(atPath: socketPath) else { return }
+        guard await !XcodeCacheSocketProbe.isListening(at: socketPath) else {
             throw XcodeCacheServerError.socketPathOccupied(socketPath: socketPath)
         }
         // The unlink itself failing (e.g. EPERM) must surface here rather than
         // fall through to a confusing bind failure against the file that remains.
         try fileManager.removeItem(atPath: socketPath)
-        runtimeDirectory.removePIDFile()
-    }
-
-    /// Claims the pidfile for `record` before the server binds its socket.
-    ///
-    /// The write is atomic (`O_EXCL`-equivalent) so two runners racing to
-    /// start the same profile cannot both believe they own it: whichever
-    /// loses the race sees the other's file already exist and either backs
-    /// off (the winner is alive) or reclaims a leftover file from a process
-    /// that is no longer running, retrying exactly once. This keeps "the
-    /// pidfile exists" a precondition of "the socket is bound," so a
-    /// concurrent stale-socket check never has to guess whether a pidfile
-    /// belongs to the process currently claiming the path.
-    private func claimPIDFile(
-        runtimeDirectory: XcodeCacheRuntimeDirectory,
-        record: XcodeServeProcessRecord,
-        allowRetry: Bool = true
-    ) throws {
-        let data = try JSONEncoder().encode(record)
-        do {
-            try data.write(to: runtimeDirectory.pidFileURL, options: .withoutOverwriting)
-        } catch CocoaError.fileWriteFileExists {
-            try reclaimPIDFileAfterExistingClaim(
-                runtimeDirectory: runtimeDirectory,
-                record: record,
-                allowRetry: allowRetry
-            )
-        }
-    }
-
-    /// Handles an `O_EXCL`-style write losing the pidfile-claim race.
-    ///
-    /// Split out of ``claimPIDFile(runtimeDirectory:record:allowRetry:)``
-    /// purely to keep that method's own nesting shallow; the retry-once
-    /// contract described there is unchanged.
-    private func reclaimPIDFileAfterExistingClaim(
-        runtimeDirectory: XcodeCacheRuntimeDirectory,
-        record: XcodeServeProcessRecord,
-        allowRetry: Bool
-    ) throws {
-        guard allowRetry else {
-            throw XcodeCacheServerError.socketPathOccupied(socketPath: socketPath)
-        }
-        if let existing = readProcessRecord(at: runtimeDirectory.pidFileURL), livenessProbe.isAlive(existing) {
-            throw XcodeCacheServerError.socketPathOccupied(socketPath: socketPath)
-        }
-        runtimeDirectory.removePIDFile()
-        try claimPIDFile(runtimeDirectory: runtimeDirectory, record: record, allowRetry: false)
-    }
-
-    private func readProcessRecord(at url: URL) -> XcodeServeProcessRecord? {
-        guard let data = fileManager.contents(atPath: url.path) else { return nil }
-        return try? JSONDecoder().decode(XcodeServeProcessRecord.self, from: data)
     }
 }

@@ -21,7 +21,7 @@ package final class XcodeCacheServerSession: Sendable {
     private let runtimeDirectory: XcodeCacheRuntimeDirectory
     private let metricsFileURL: URL?
     private let metricsFile: X8CacheMetricsSnapshotFile
-    private let ownsPIDFile: Bool
+    private let pidFileLease: PIDFileLease?
 
     /// Creates a session from a ready server and its serving task.
     ///
@@ -29,9 +29,9 @@ package final class XcodeCacheServerSession: Sendable {
     ///   - server: The server whose `serve()` task is already running and ready.
     ///   - task: The task that owns the server's long-running serving operation.
     ///   - runtimeDirectory: The runtime directory that contains the server socket.
-    ///   - ownsPIDFile: Whether the caller already claimed this runtime
-    ///     directory's pidfile before starting the server, so this session
-    ///     removes it alongside the socket on shutdown.
+    ///   - pidFileLease: The caller's already-claimed pidfile lock, if any,
+    ///     transferred to this session so it releases the lock alongside the
+    ///     socket on shutdown.
     ///   - fileManager: The filesystem dependency used to create a fallback
     ///     runtime-directory value when `runtimeDirectory` is omitted.
     package init(
@@ -39,14 +39,14 @@ package final class XcodeCacheServerSession: Sendable {
         task: Task<Void, Error>,
         runtimeDirectory: XcodeCacheRuntimeDirectory? = nil,
         metricsFileURL: URL? = nil,
-        ownsPIDFile: Bool = false,
+        pidFileLease: PIDFileLease? = nil,
         fileManager: any FileManagerProtocol = FileManager.default
     ) {
         socketPath = server.socketPath
         self.server = server
         self.task = task
         self.metricsFileURL = metricsFileURL
-        self.ownsPIDFile = ownsPIDFile
+        self.pidFileLease = pidFileLease
         metricsFile = X8CacheMetricsSnapshotFile(fileManager: fileManager)
         self.runtimeDirectory = runtimeDirectory ?? XcodeCacheRuntimeDirectory(
             url: URL(filePath: server.socketPath).deletingLastPathComponent(),
@@ -64,12 +64,12 @@ package final class XcodeCacheServerSession: Sendable {
         } catch {
             await persistMetrics()
             removeSocket()
-            removePIDFile()
+            pidFileLease?.release()
             throw error
         }
         await persistMetrics()
         removeSocket()
-        removePIDFile()
+        pidFileLease?.release()
     }
 
     /// Requests graceful shutdown, waits for the task, and cleans up the socket.
@@ -82,7 +82,7 @@ package final class XcodeCacheServerSession: Sendable {
         _ = await task.result
         await persistMetrics()
         removeSocket()
-        removePIDFile()
+        pidFileLease?.release()
     }
 
     /// Signals graceful shutdown without waiting for completion.
@@ -100,7 +100,7 @@ package final class XcodeCacheServerSession: Sendable {
         let metricsFileURL = metricsFileURL
         let metricsFile = metricsFile
         let metrics = server.metrics
-        let ownsPIDFile = ownsPIDFile
+        let pidFileLease = pidFileLease
 
         // A dropped handle cannot await shutdown. Keep the session alive until the server drains.
         server.beginGracefulShutdown()
@@ -112,9 +112,7 @@ package final class XcodeCacheServerSession: Sendable {
                 try? await metricsFile.write(snapshot, to: metricsFileURL)
             }
             runtimeDirectory.removeSocket()
-            if ownsPIDFile {
-                runtimeDirectory.removePIDFile()
-            }
+            pidFileLease?.release()
         }
     }
 
@@ -127,10 +125,5 @@ package final class XcodeCacheServerSession: Sendable {
 
     private func removeSocket() {
         runtimeDirectory.removeSocket()
-    }
-
-    private func removePIDFile() {
-        guard ownsPIDFile else { return }
-        runtimeDirectory.removePIDFile()
     }
 }

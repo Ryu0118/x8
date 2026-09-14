@@ -7,7 +7,7 @@ import X8Storage
 
 @Suite("Xcode standalone server stale-socket reclamation")
 struct XcodeServeRunnerIntegrationTests {
-    @Test("refuses a path a live listener answers on, even with a dead-process pidfile")
+    @Test("refuses a path a live listener answers on, even with an unheld pidfile")
     func refusesLiveListenerRegardlessOfPIDFile() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "x8-serve-\(UUID().uuidString.prefix(8))", directoryHint: .isDirectory)
@@ -26,6 +26,8 @@ struct XcodeServeRunnerIntegrationTests {
         }
         defer { listenerTask.cancel() }
 
+        // A leftover, unheld pidfile from an unrelated prior process. The
+        // listening probe alone must still refuse this path.
         let record = XcodeServeProcessRecord(pid: 1, startTime: 0, executablePath: "/usr/bin/x8")
         try JSONEncoder().encode(record).write(to: directory.appending(path: "serve.pid"))
 
@@ -33,8 +35,7 @@ struct XcodeServeRunnerIntegrationTests {
         let runner = XcodeServeRunner(
             socketPath: socket.path,
             casStore: storage,
-            actionCacheStore: storage,
-            livenessProbe: AlwaysDeadProcessLivenessProbe()
+            actionCacheStore: storage
         )
 
         do {
@@ -45,11 +46,5 @@ struct XcodeServeRunnerIntegrationTests {
         } catch {
             Issue.record("Expected a socket-path error, got \(error).")
         }
-    }
-}
-
-private struct AlwaysDeadProcessLivenessProbe: ProcessLivenessProbing {
-    func isAlive(_: XcodeServeProcessRecord) -> Bool {
-        false
     }
 }
