@@ -7,7 +7,7 @@ testable. Repository change procedure belongs in the change-management rule.
 
 - `x8` is the S3-only composition root: connect X8Config loading and presentation, S3Storage construction, and cleanup to X8CLI.
 - `X8CLI` owns the shared command tree, argument parsing, presentation, external-process adapter, and command-scoped storage ownership. It accepts separate configuration, storage, and shutdown closures without requiring a CLI-specific storage protocol.
-- `X8Kit` owns cache-server use cases through focused session and server types. Custom interfaces can use it directly.
+- `X8Kit` owns cache-server use cases through focused session and server types. It is an internal implementation layer of `X8CLI`, not a directly embeddable public library; a custom executable builds on `X8CLI` instead.
 - `X8Storage` owns the storage protocol and cache hit/miss semantics; `X8S3` owns the S3-compatible adapter.
 - `X8Core` owns lowest-level domain types and must not depend on storage, networking, Soto, or CLI code.
 - Keep dependencies one-directional:

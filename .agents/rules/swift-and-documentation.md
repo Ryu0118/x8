@@ -6,7 +6,7 @@ Architecture and repository-change procedure are defined in separate rules.
 ## Swift boundaries
 
 - Use Swift 6 strict concurrency and mark values crossing async boundaries `Sendable` where appropriate.
-- Use `private` by default, `package` for implementation APIs shared inside this package, and `public` only for deliberate library APIs such as the `X8Kit` custom-CLI surface.
+- Use `private` by default, `package` for implementation APIs shared inside this package, and `public` only for deliberate library APIs such as the `X8CLI` custom-CLI surface.
 - Keep stored protocol dependencies as `any Protocol`; use `some Protocol` for initializer parameters when the concrete type need not escape.
 - Keep one concern per file and group related files only when the group is meaningful; do not create a directory for a lone file.
 - Within a function, separate setup, transformation, side effects, and result handling into readable blocks with blank lines. Do not insert blank lines between every statement.

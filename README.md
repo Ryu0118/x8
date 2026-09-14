@@ -293,13 +293,12 @@ and its S3 schema remain specific to the official executable. Administrative
 commands additionally require the corresponding X8Storage capabilities.
 
 Start with the [custom CLI guide](https://ryu0118.github.io/x8/documentation/x8cli/creatingacustomcli/)
-and the [complete example package](Examples/CustomStorageCLI). Use **X8Kit**
-directly when you want to design a different interface or embed the cache server.
+and the [complete example package](Examples/CustomStorageCLI).
 
 ## Documentation
 
 Full API documentation is published at
-[ryu0118.github.io/x8/documentation/x8kit](https://ryu0118.github.io/x8/documentation/x8kit/).
+[ryu0118.github.io/x8/documentation/x8cli](https://ryu0118.github.io/x8/documentation/x8cli/).
 
 - [Prefix mapping](https://ryu0118.github.io/x8/documentation/x8kit/prefixmapping)
   explains how build paths are made portable across machines, the toolchain

@@ -46,11 +46,10 @@ is supported or safe.
 
 ## Connect an executable
 
-Choose X8CLI for the shared x8 command interface, or X8Kit for your own
-application interface. Your executable owns configuration and authentication,
-constructs the storage implementation, and supplies its cleanup operation.
-Neither a CLI-specific storage protocol nor changes to the official S3-only
-executable are required.
+Build your own executable on X8CLI, the shared x8 command interface. Your
+executable owns configuration and authentication, constructs the storage
+implementation, and supplies its cleanup operation. Neither a CLI-specific
+storage protocol nor changes to the official S3-only executable are required.
 
 Test missing records, provider failures, byte/reference round trips, stream
 failures, cancellation, and cleanup with deterministic clients. Put real

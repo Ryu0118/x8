@@ -23,7 +23,7 @@ and the official executable (`x8`).
 ```text
 Sources/x8/         S3-only executable and configuration/storage composition
 Sources/X8CLI/      shared command interface with injected configuration and storage
-Sources/X8Kit/      storage-agnostic cache use cases for custom interfaces
+Sources/X8Kit/      storage-agnostic cache use cases behind X8CLI's commands
 Sources/X8Config/   YAML configuration loading/resolution and S3-shaped profile model
 Sources/X8S3/       S3-compatible storage adapter
 Sources/X8Storage/  storage protocol and cache semantics
@@ -54,4 +54,4 @@ These rules apply repository-wide and are intentionally partitioned by concern:
 - Keep `stats` an undocumented diagnostic: preserve direct invocation without advertising it in help, README, or new user guides.
 - Keep Soto and S3-specific configuration out of `X8Core` and `X8Storage`.
 - Verify the Xcode compilation-cache wire protocol before designing protocol-specific APIs.
-- Keep generated gRPC sources under `Sources/X8Kit/Generated`; use the Kit proxy as the reusable public surface.
+- Keep generated gRPC sources under `Sources/X8Kit/Generated`; use the Kit proxy as the reusable internal surface behind `X8CLI`.

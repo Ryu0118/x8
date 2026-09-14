@@ -4,10 +4,11 @@ Reuse x8's commands while supplying your own storage and configuration.
 
 ## Choose the reusable surface
 
-Use `X8CLI` when you want the same `xcodebuild`, `serve`, `config`, `doctor`,
-and `cache purge` interface as the official executable. Use `X8Kit` directly
-when you are designing a different interface or embedding the cache server in
-an existing application.
+Use `X8CLI` for the same `xcodebuild`, `serve`, `config`, `doctor`, and
+`cache purge` interface as the official executable. `X8CLI` is the only
+supported entry point for a custom executable; `X8Kit`, the cache use cases
+behind those commands, is an internal implementation detail of `X8CLI` and is
+not a separate public library.
 
 The official `x8` binary continues to support S3-compatible storage only.
 Installing a separate storage package does not add storage choices to that binary.

@@ -32,14 +32,14 @@ disk-backed CAS responses are removed when the server's serving loop ends.
 
 ## Runtime modes
 
-``XcodeCacheSession`` creates a private runtime directory and socket for one
+`XcodeCacheSession` creates a private runtime directory and socket for one
 external Xcode client. It starts the proxy, exposes the cache environment, and
 removes the runtime directory when the caller shuts the session down. It never
 launches or observes `xcodebuild`; the outer frontend owns that process
 boundary.
 
-``XcodeServeRunner`` uses a caller-selected stable socket, refuses to unlink an
-existing endpoint, and returns an ``XcodeServeHandle`` after readiness. The
+`XcodeServeRunner` uses a caller-selected stable socket, refuses to unlink an
+existing endpoint, and returns an `XcodeServeHandle` after readiness. The
 handle keeps the standalone server session alive. A foreground command can
 wait for `SIGINT` or `SIGTERM` through `waitForTerminationSignal()`, while a
 supervisor can call `shutdown()` directly.
