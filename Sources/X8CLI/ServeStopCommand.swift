@@ -17,7 +17,7 @@ struct ServeStopCommand: X8ExecutableCommand {
         let pidFileURL = XcodeServeRunner.defaultPIDFileURL(profileID: profileID)
         let socketPath = XcodeServeRunner.defaultSocketPath(profileID: profileID)
 
-        guard let record = Self.readProcessRecord(at: pidFileURL) else {
+        guard let record = XcodeServeRunner.readProcessRecord(at: pidFileURL) else {
             context.logger.info("No detached `x8 serve` process is running for this profile.")
             return
         }
@@ -76,10 +76,5 @@ struct ServeStopCommand: X8ExecutableCommand {
     private static func cleanUp(pidFileURL: URL, socketPath: String) {
         try? FileManager.default.removeItem(at: pidFileURL)
         try? FileManager.default.removeItem(atPath: socketPath)
-    }
-
-    private static func readProcessRecord(at url: URL) -> XcodeServeProcessRecord? {
-        guard let data = FileManager.default.contents(atPath: url.path) else { return nil }
-        return try? JSONDecoder().decode(XcodeServeProcessRecord.self, from: data)
     }
 }
