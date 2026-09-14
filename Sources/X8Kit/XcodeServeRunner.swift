@@ -24,6 +24,7 @@ public struct XcodeServeRunner: Sendable {
     private let fileManager: any FileManagerProtocolMacOS
     private let workingDirectory: URL?
     private let events: X8CacheEventBroadcaster
+    private let livenessProbe: any ProcessLivenessProbing
 
     /// Creates a standalone runner for one stable socket endpoint.
     ///
@@ -39,13 +40,21 @@ public struct XcodeServeRunner: Sendable {
     ///   - metrics: The recorder receiving cache traffic observations. Every
     ///     event also becomes available to ``startEventsSocket(profileID:)``,
     ///     regardless of whether that socket is ever started.
+    ///   - livenessProbe: Determines whether a PID recorded in a stale-looking
+    ///     socket's pidfile is still running. Defaults to treating every
+    ///     recorded process as alive, so a caller without a liveness check
+    ///     never reclaims a socket whose pidfile it cannot disprove — a
+    ///     socket with no pidfile at all is still reclaimed once nothing
+    ///     answers on it. A frontend that can check process liveness should
+    ///     inject its live implementation here.
     public init(
         socketPath: String,
         casStore: any CASStore,
         actionCacheStore: any ActionCacheStore,
         workingDirectory: URL? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default,
-        metrics: any X8CacheMetricsRecorder = X8CacheMetricsStore()
+        metrics: any X8CacheMetricsRecorder = X8CacheMetricsStore(),
+        livenessProbe: any ProcessLivenessProbing = AlwaysAliveProcessLivenessProbe()
     ) {
         let events = X8CacheEventBroadcaster(wrapping: metrics)
         self.init(
@@ -55,7 +64,8 @@ public struct XcodeServeRunner: Sendable {
             serverFactory: XcodeCacheServer.liveFactory(metrics: events),
             workingDirectory: workingDirectory,
             fileManager: fileManager,
-            events: events
+            events: events,
+            livenessProbe: livenessProbe
         )
     }
 
@@ -68,7 +78,8 @@ public struct XcodeServeRunner: Sendable {
         workingDirectory: URL? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default,
         serverLifecycle: XcodeCacheServerLifecycle? = nil,
-        events: X8CacheEventBroadcaster = X8CacheEventBroadcaster(wrapping: X8CacheMetricsStore())
+        events: X8CacheEventBroadcaster = X8CacheEventBroadcaster(wrapping: X8CacheMetricsStore()),
+        livenessProbe: any ProcessLivenessProbing = AlwaysAliveProcessLivenessProbe()
     ) {
         self.socketPath = socketPath
         self.casStore = casStore
@@ -77,6 +88,7 @@ public struct XcodeServeRunner: Sendable {
         self.workingDirectory = workingDirectory
         self.fileManager = fileManager
         self.events = events
+        self.livenessProbe = livenessProbe
         self.serverLifecycle = serverLifecycle ?? XcodeCacheServerLifecycle(
             fileManager: fileManager
         )
@@ -137,9 +149,13 @@ public struct XcodeServeRunner: Sendable {
 
     /// Starts the server and returns once its socket endpoint is ready.
     ///
-    /// An existing path is rejected rather than unlinked because it may belong
-    /// to another live server or an external supervisor. The returned handle
-    /// must be retained to keep the serving session under caller ownership.
+    /// An existing path is rejected when it still looks live — answering a
+    /// connection, or naming a pidfile whose process the injected
+    /// ``ProcessLivenessProbing`` confirms alive — since it may belong to
+    /// another running server. A path with no answering listener and no
+    /// confirmed-live pidfile is stale and reclaimed automatically. The
+    /// returned handle must be retained to keep the serving session under
+    /// caller ownership.
     ///
     /// - Returns: A handle for observing or stopping the running server.
     /// - Throws: If the endpoint is occupied, its directory cannot be prepared,
@@ -153,7 +169,7 @@ public struct XcodeServeRunner: Sendable {
             fileManager: fileManager
         )
         try runtimeDirectory.create(withIntermediateDirectories: true)
-        try prepareSocketPath()
+        try await prepareSocketPath(runtimeDirectory: runtimeDirectory)
         let session = try await serverLifecycle.start(
             runtimeDirectory: runtimeDirectory,
             casStore: casStore,
@@ -172,9 +188,31 @@ public struct XcodeServeRunner: Sendable {
         )
     }
 
-    private func prepareSocketPath() throws {
+    /// Reclaims a stale socket file, or rejects the path if it still looks live.
+    ///
+    /// A path already answering as a live listener is left untouched — the
+    /// connection probe alone settles that, regardless of a pidfile's
+    /// content or absence, since a listener that answers can only belong to a
+    /// running process. Only when nothing answers does the pidfile matter: an
+    /// absent, unreadable, or dead-process pidfile marks the socket stale and
+    /// safe to unlink, while a pidfile whose process is confirmed alive
+    /// still refuses the path.
+    private func prepareSocketPath(runtimeDirectory: XcodeCacheRuntimeDirectory) async throws {
         guard fileManager.fileExists(atPath: socketPath) else { return }
-        // Never unlink an existing endpoint: it may belong to a live server or an external supervisor.
-        throw XcodeCacheServerError.socketPathOccupied(socketPath: socketPath)
+        guard await !XcodeCacheSocketProbe.isListening(at: socketPath) else {
+            throw XcodeCacheServerError.socketPathOccupied(socketPath: socketPath)
+        }
+        if let record = readProcessRecord(at: runtimeDirectory.pidFileURL), livenessProbe.isAlive(record) {
+            throw XcodeCacheServerError.socketPathOccupied(socketPath: socketPath)
+        }
+        // The unlink itself failing (e.g. EPERM) must surface here rather than
+        // fall through to a confusing bind failure against the file that remains.
+        try fileManager.removeItem(atPath: socketPath)
+        runtimeDirectory.removePIDFile()
+    }
+
+    private func readProcessRecord(at url: URL) -> XcodeServeProcessRecord? {
+        guard let data = fileManager.contents(atPath: url.path) else { return nil }
+        return try? JSONDecoder().decode(XcodeServeProcessRecord.self, from: data)
     }
 }

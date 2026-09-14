@@ -72,16 +72,7 @@ package struct X8CacheEventsListener: Sendable {
 
     /// Returns whether `path` is free to bind: absent, or a stale file with no live listener.
     private func pathIsBindable(_ path: String) async -> Bool {
-        do {
-            let probe = try await ClientBootstrap(group: .singletonMultiThreadedEventLoopGroup)
-                .connectTimeout(.milliseconds(200))
-                .connect(unixDomainSocketPath: path)
-                .get()
-            probe.close(promise: nil)
-            return false
-        } catch {
-            return true
-        }
+        await !XcodeCacheSocketProbe.isListening(at: path)
     }
 
     /// Wraps `channel` into a writer and immediately consumes it.

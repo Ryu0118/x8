@@ -6,7 +6,35 @@ import X8Storage
 @Suite("Xcode standalone server socket ownership")
 struct XcodeServeRunnerTests {
     @Test
-    func refusesToReplaceExistingSocketPath() async throws {
+    func refusesToReplaceExistingSocketPathWithAlivePIDFile() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "x8-serve-test-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let socket = directory.appending(path: "cache.sock")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: socket.path, contents: nil)
+        try writePIDFile(inDirectory: directory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let storage = InMemoryStorage()
+        let runner = XcodeServeRunner(
+            socketPath: socket.path,
+            casStore: storage,
+            actionCacheStore: storage,
+            livenessProbe: AlwaysAliveProcessLivenessProbe()
+        )
+
+        do {
+            _ = try await runner.start()
+            Issue.record("Expected an existing socket path to be rejected.")
+        } catch let error as XcodeCacheServerError {
+            #expect(error == .socketPathOccupied(socketPath: socket.path))
+        } catch {
+            Issue.record("Expected a socket-path error, got \(error).")
+        }
+    }
+
+    @Test
+    func reclaimsStaleSocketWithNoPIDFile() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "x8-serve-test-\(UUID().uuidString)", directoryHint: .isDirectory)
         let socket = directory.appending(path: "cache.sock")
@@ -18,17 +46,38 @@ struct XcodeServeRunnerTests {
         let runner = XcodeServeRunner(
             socketPath: socket.path,
             casStore: storage,
-            actionCacheStore: storage
+            actionCacheStore: storage,
+            serverFactory: { socketPath, _, _, _ in TestCacheServer(socketPath: socketPath) },
+            livenessProbe: AlwaysDeadProcessLivenessProbe()
         )
 
-        do {
-            _ = try await runner.start()
-            Issue.record("Expected an existing socket path to be rejected.")
-        } catch let error as XcodeCacheServerError {
-            #expect(error == .socketPathOccupied(socketPath: socket.path))
-        } catch {
-            Issue.record("Expected a socket-path error, got \(error).")
-        }
+        let handle = try await runner.start()
+        #expect(handle.socketPath == socket.path)
+        await handle.shutdown()
+    }
+
+    @Test
+    func reclaimsStaleSocketWithDeadPIDFile() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "x8-serve-test-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let socket = directory.appending(path: "cache.sock")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: socket.path, contents: nil)
+        try writePIDFile(inDirectory: directory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let storage = InMemoryStorage()
+        let runner = XcodeServeRunner(
+            socketPath: socket.path,
+            casStore: storage,
+            actionCacheStore: storage,
+            serverFactory: { socketPath, _, _, _ in TestCacheServer(socketPath: socketPath) },
+            livenessProbe: AlwaysDeadProcessLivenessProbe()
+        )
+
+        let handle = try await runner.start()
+        #expect(handle.socketPath == socket.path)
+        await handle.shutdown()
     }
 
     @Test
@@ -181,6 +230,12 @@ struct XcodeServeRunnerTests {
         }
         #expect(FileManager.default.fileExists(atPath: socket.path) == false)
     }
+
+    private func writePIDFile(inDirectory directory: URL) throws {
+        let record = XcodeServeProcessRecord(pid: 1, startTime: 0, executablePath: "/usr/bin/x8")
+        let data = try JSONEncoder().encode(record)
+        try data.write(to: directory.appending(path: "serve.pid"))
+    }
 }
 
 private struct ImmediateTerminationSignalWaiter: TerminationSignalWaiting {
@@ -207,3 +262,9 @@ private struct NeverTerminationSignalWaiter: TerminationSignalWaiting {
 }
 
 private struct ServerFailure: Error, Sendable {}
+
+private struct AlwaysDeadProcessLivenessProbe: ProcessLivenessProbing {
+    func isAlive(_: XcodeServeProcessRecord) -> Bool {
+        false
+    }
+}
