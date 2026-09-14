@@ -29,7 +29,7 @@ no backend lock-in.
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Enabling the remote cache](#enabling-the-remote-cache)
-  - [`xcodebuild` and CI builds](#1-xcodebuild-and-ci-builds)
+  - [`xcodebuild`](#1-xcodebuild)
   - [Xcode.app GUI builds](#2-xcodeapp-gui-builds)
 - [Configuration](#configuration)
 - [Commands](#commands)
@@ -111,7 +111,7 @@ mise use -g github:Ryu0118/x8
    x8 xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
    ```
 
-   That's all a command-line or CI build needs. Building from Xcode.app
+   That's all a command-line build needs. Building from Xcode.app
    instead uses a long-running `x8 serve` plus a few build settings — see
    [Xcode.app GUI builds](#2-xcodeapp-gui-builds) below.
 
@@ -122,7 +122,7 @@ For command-line builds, `x8 xcodebuild` supplies the cache connection and
 prefix-mapping settings without changing build paths. For Xcode.app builds,
 configure the printed cache settings in the project or an `.xcconfig`.
 
-### 1. `xcodebuild` and CI builds
+### 1. `xcodebuild`
 
 Wraps a normal `xcodebuild` invocation with an embedded, invocation-scoped
 proxy. No `.xcconfig` or `project.pbxproj` edits required:
@@ -139,7 +139,7 @@ directories.
 x8 also makes the build portable across machines through *prefix mapping*:
 compiled output normally embeds absolute paths such as
 `/Users/you/src/MyApp`, which differ on every machine and would prevent a
-module built on your Mac from being a cache hit on CI. Prefix mapping replaces
+module built on your Mac from being a cache hit on another machine. Prefix mapping replaces
 those paths with stable placeholders before they reach the cache. Concretely,
 x8 injects the cache connection and prefix-mapping settings as
 `SETTING=VALUE` overrides, mapping the working directory to the shared
