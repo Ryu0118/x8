@@ -43,7 +43,7 @@ rules:
   doc: README.md
   message: CLI command surface changed - update the README Commands table and Enabling
     the remote cache section if commands, flags, or usage changed.
-  checksum: 6be0bc5562d2aada2011930a316e29d9d5fa7c5d514bfe05eb57d51fb9ac412a
+  checksum: b139d5c4396339c41f549cfb5322a96fa049c4ecaaa1b48c200fc9becac8a692
 - name: readme-configuration
   sources:
   - Sources/X8Config/X8ConfigurationDocument.swift
