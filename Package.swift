@@ -298,7 +298,16 @@ let package = Package(
         ),
         .testTarget(
             name: "X8CLIIntegrationTests",
-            dependencies: ["X8CLI", "X8Storage"]
+            dependencies: [
+                "X8CLI",
+                "X8Config",
+                "X8Kit",
+                "X8Storage",
+                .product(name: "Subprocess", package: "swift-subprocess"),
+            ],
+            swiftSettings: [
+                .define("X8_S3", .when(traits: ["S3"])),
+            ]
         ),
     ]
 )
