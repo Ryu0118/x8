@@ -165,7 +165,8 @@ struct ServeCommand: X8ExecutableCommand {
             )
         case let .exitedBeforeReady(status):
             throw ValidationError(
-                "The detached `x8 serve` process exited before becoming ready (status \(status)). " +
+                "The detached `x8 serve` process exited before becoming ready " +
+                    "(status \(Self.exitStatus(fromRawWaitStatus: status))). " +
                     "See \(logFileURL.path) for details."
             )
         case .timedOut:
@@ -181,6 +182,15 @@ struct ServeCommand: X8ExecutableCommand {
             filePath: path ?? FileManager.default.currentDirectoryPath,
             directoryHint: .isDirectory
         )
+    }
+
+    /// Extracts a plain exit code from `waitpid`'s raw wait-status.
+    ///
+    /// `WEXITSTATUS` is a function-like macro Swift cannot call directly;
+    /// this reproduces its bit shift so the diagnostic below matches the
+    /// process's actual exit code instead of the kernel's packed encoding.
+    private static func exitStatus(fromRawWaitStatus status: Int32) -> Int32 {
+        (status >> 8) & 0xFF
     }
 
     /// Builds the child's `argv`, reusing this invocation's flags plus the hidden readiness marker.
