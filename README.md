@@ -54,10 +54,7 @@ why any S3-compatible provider works).
 
 x8 needs Xcode 27 or later (which itself requires macOS 26) and an
 S3-compatible bucket — AWS S3, Cloudflare R2, MinIO, or similar. That is all
-you need to get started. Xcode 26 is unsupported because it crashes on cached,
-prefix-mapped builds; the
-[Toolchain support](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#toolchain-support)
-note has the details if you are curious, but you don't need to read it now.
+you need to get started.
 
 ### Nest ([mtj0928/nest](https://github.com/mtj0928/nest))
 
