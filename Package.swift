@@ -2,6 +2,12 @@
 
 import PackageDescription
 
+/// The compile-time flag every S3-trait-gated target defines, so its source
+/// can branch on `#if X8_S3` without each target retyping the trait check.
+let s3TraitSwiftSettings: [SwiftSetting] = [
+    .define("X8_S3", .when(traits: ["S3"])),
+]
+
 let package = Package(
     name: "X8",
     platforms: [
@@ -89,9 +95,7 @@ let package = Package(
                     condition: .when(traits: ["S3"])
                 ),
             ],
-            swiftSettings: [
-                .define("X8_S3", .when(traits: ["S3"])),
-            ]
+            swiftSettings: s3TraitSwiftSettings
         ),
         .target(name: "X8Core"),
         .target(
@@ -143,9 +147,7 @@ let package = Package(
                     package: "swift-async-operations"
                 ),
             ],
-            swiftSettings: [
-                .define("X8_S3", .when(traits: ["S3"])),
-            ]
+            swiftSettings: s3TraitSwiftSettings
         ),
         .target(
             name: "X8Config",
@@ -207,9 +209,7 @@ let package = Package(
                     condition: .when(traits: ["S3"])
                 ),
             ],
-            swiftSettings: [
-                .define("X8_S3", .when(traits: ["S3"])),
-            ]
+            swiftSettings: s3TraitSwiftSettings
         ),
         .testTarget(
             name: "X8CoreTests",
@@ -244,9 +244,7 @@ let package = Package(
                     package: "swift-async-operations"
                 ),
             ],
-            swiftSettings: [
-                .define("X8_S3", .when(traits: ["S3"])),
-            ]
+            swiftSettings: s3TraitSwiftSettings
         ),
         .testTarget(
             name: "X8KitTests",
@@ -305,9 +303,7 @@ let package = Package(
                 "X8Storage",
                 .product(name: "Subprocess", package: "swift-subprocess"),
             ],
-            swiftSettings: [
-                .define("X8_S3", .when(traits: ["S3"])),
-            ]
+            swiftSettings: s3TraitSwiftSettings
         ),
     ]
 )
