@@ -8,9 +8,12 @@ import X8Kit
 /// unrelated process that later reused the same PID, so this probe also
 /// compares the kernel's recorded start time for that PID against the
 /// pidfile's `startTime`, within a small tolerance for encoding rounding.
-struct LiveProcessLivenessProbe: ProcessLivenessProbing {
+package struct LiveProcessLivenessProbe: ProcessLivenessProbing {
     /// The allowed drift, in seconds, between a recorded and observed start time.
     private static let startTimeTolerance: Double = 1
+
+    /// Creates a probe backed by the real process table.
+    package init() {}
 
     /// Returns whether `record`'s PID is running and still matches its start time.
     ///
@@ -18,7 +21,7 @@ struct LiveProcessLivenessProbe: ProcessLivenessProbing {
     /// which is not enough under PID reuse; comparing `sysctl`'s
     /// `kp_proc.p_starttime` against the recorded value rules out a
     /// coincidentally-reused PID belonging to an unrelated process.
-    func isAlive(_ record: XcodeServeProcessRecord) -> Bool {
+    package func isAlive(_ record: XcodeServeProcessRecord) -> Bool {
         switch Self.probeKill(record.pid) {
         case .noSuchProcess:
             return false

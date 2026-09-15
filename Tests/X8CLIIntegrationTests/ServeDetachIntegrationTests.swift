@@ -4,7 +4,7 @@
     import Subprocess
     import System
     import Testing
-    @testable import X8CLI
+    import X8CLI
     import X8Config
     import X8Kit
 
@@ -21,7 +21,7 @@
 
                 let record = try fixture.readRecord()
                 #expect(record.executablePath == fixture.executable.resolvingSymlinksInPath().path)
-                #expect(fixture.isAlive(record.pid))
+                #expect(fixture.isAlive(record))
                 #expect(try await fixture.waitUntil { fixture.canConnect() })
                 #expect(FileManager.default.fileExists(atPath: fixture.eventsSocketPath))
             }
@@ -51,7 +51,7 @@
                 #expect(stillFirst.pid == first.pid)
                 #expect(stillFirst.startTime == first.startTime)
                 #expect(try Data(contentsOf: fixture.pidFileURL) == pidBytes)
-                #expect(fixture.isAlive(first.pid))
+                #expect(fixture.isAlive(first))
             }
         }
 
@@ -66,7 +66,7 @@
                 let stop = try await fixture.run(["serve", "stop"])
                 #expect(stop.status == 0)
                 #expect(stop.stderr.contains("Stopped the detached `x8 serve` process (pid \(record.pid))"))
-                #expect(try await fixture.waitUntil(.seconds(2)) { fixture.isGone(record.pid) })
+                #expect(try await fixture.waitUntil(.seconds(2)) { fixture.isGone(record) })
                 #expect(!FileManager.default.fileExists(atPath: fixture.pidFileURL.path))
                 #expect(!FileManager.default.fileExists(atPath: fixture.socketPath))
                 #expect(!FileManager.default.fileExists(atPath: fixture.eventsSocketPath))
@@ -82,7 +82,7 @@
                 let old = try fixture.readRecord()
 
                 #expect(kill(old.pid, SIGKILL) == 0)
-                #expect(try await fixture.waitUntil(.seconds(2)) { fixture.isGone(old.pid) })
+                #expect(try await fixture.waitUntil(.seconds(2)) { fixture.isGone(old) })
                 #expect(FileManager.default.fileExists(atPath: fixture.pidFileURL.path))
                 #expect(FileManager.default.fileExists(atPath: fixture.socketPath))
                 #expect(FileManager.default.fileExists(atPath: fixture.eventsSocketPath))
@@ -92,7 +92,7 @@
                 let new = try fixture.readRecord()
                 #expect(new.pid != old.pid)
                 #expect(new.startTime != old.startTime)
-                #expect(fixture.isAlive(new.pid))
+                #expect(fixture.isAlive(new))
                 #expect(try await fixture.waitUntil { fixture.canConnect() })
                 let log = try String(contentsOf: fixture.logFileURL, encoding: .utf8)
                 #expect(!log.contains("Live cache-events socket unavailable"))
@@ -107,7 +107,7 @@
                 #expect(start.status == 0)
                 let record = try fixture.readRecord()
                 #expect(kill(record.pid, SIGKILL) == 0)
-                #expect(try await fixture.waitUntil(.seconds(2)) { fixture.isGone(record.pid) })
+                #expect(try await fixture.waitUntil(.seconds(2)) { fixture.isGone(record) })
 
                 let stop = try await fixture.run(["serve", "stop"])
                 #expect(stop.status == 0)
@@ -143,7 +143,8 @@
         let eventsSocketPath: String
         let logFileURL: URL
         private let lock = NSLock()
-        private var trackedPIDs: Set<Int32> = []
+        private var trackedRecords: [XcodeServeProcessRecord] = []
+        private let livenessProbe = LiveProcessLivenessProbe()
 
         init() throws {
             let override = ProcessInfo.processInfo.environment["X8_EXECUTABLE"]
@@ -220,16 +221,21 @@
             guard let record = XcodeServeRunner.readProcessRecord(at: pidFileURL) else {
                 throw FixtureError.pidFileUnreadable(pidFileURL.path)
             }
-            lock.withLock { _ = trackedPIDs.insert(record.pid) }
+            lock.withLock { trackedRecords.append(record) }
             return record
         }
 
-        func isAlive(_ pid: Int32) -> Bool {
-            kill(pid, 0) == 0
+        /// Whether `record`'s PID is still running as the same process.
+        ///
+        /// Delegates to the same start-time-checked probe production code
+        /// uses, rather than a bare `kill(pid, 0)`, so a PID a dead daemon
+        /// freed and an unrelated process later reused cannot read as alive.
+        func isAlive(_ record: XcodeServeProcessRecord) -> Bool {
+            livenessProbe.isAlive(record)
         }
 
-        func isGone(_ pid: Int32) -> Bool {
-            kill(pid, 0) == -1 && errno == ESRCH
+        func isGone(_ record: XcodeServeProcessRecord) -> Bool {
+            !isAlive(record)
         }
 
         func canConnect() -> Bool {
@@ -270,12 +276,12 @@
         /// exit is observed through `kill(pid, 0)` instead.
         func tearDown() async {
             _ = try? await run(["serve", "stop"])
-            let pids = lock.withLock { trackedPIDs }
-            for pid in pids {
-                _ = kill(pid, SIGKILL)
+            let records = lock.withLock { trackedRecords }
+            for record in records {
+                _ = kill(record.pid, SIGKILL)
             }
-            for pid in pids {
-                _ = try? await waitUntil(.seconds(2)) { isGone(pid) }
+            for record in records {
+                _ = try? await waitUntil(.seconds(2)) { isGone(record) }
             }
             try? FileManager.default.removeItem(at: runtimeDirectory)
             try? FileManager.default.removeItem(at: configDirectory)
