@@ -22,13 +22,18 @@ package struct X8CacheStatsRunner: Sendable {
 
     /// Reads the last completed snapshot for a serve profile.
     ///
-    /// - Parameter profileID: The resolved non-secret storage-profile ID.
+    /// - Parameters:
+    ///   - profileID: The resolved non-secret storage-profile ID.
+    ///   - configuredSocketPath: The fixed socket path from `.x8.yml`'s
+    ///     `socketPath`, if set, so the metrics file is found alongside a
+    ///     pinned socket instead of the per-user default.
     /// - Returns: The persisted snapshot, or `nil` when the profile has not
     ///   completed a metrics-bearing session yet.
     /// - Throws: If the snapshot exists but cannot be decoded or read.
-    package func load(profileID: String) async throws -> X8CacheMetricsSnapshot? {
+    package func load(profileID: String, configuredSocketPath: String? = nil) async throws -> X8CacheMetricsSnapshot? {
         let url = XcodeServeRunner.defaultMetricsFileURL(
             profileID: profileID,
+            configuredSocketPath: configuredSocketPath,
             fileManager: fileManager
         )
         return try await X8CacheMetricsSnapshotFile(fileManager: fileManager).read(from: url)

@@ -117,60 +117,100 @@ package struct XcodeServeRunner: Sendable {
             .path
     }
 
-    /// Returns the persisted metrics file for a stable serve profile.
+    /// Returns the socket path a command should actually use for a profile.
     ///
-    /// The path is derived from the same profile directory as
-    /// ``defaultSocketPath(profileID:fileManager:)``; this keeps diagnostics
-    /// from reconstructing a second runtime-path convention.
+    /// `configuredSocketPath` (`.x8.yml`'s `socketPath`, or a CLI override a
+    /// command resolved ahead of this call) wins when present; otherwise this
+    /// falls back to ``defaultSocketPath(profileID:fileManager:)``. Every
+    /// sibling runtime file (events socket, PID file, log file, metrics file)
+    /// is derived from whichever path this returns, so a fixed team-shared
+    /// socket path also relocates those files alongside it.
+    package static func resolvedSocketPath(
+        profileID: String,
+        configuredSocketPath: String?,
+        fileManager: any FileManagerProtocolMacOS = FileManager.default
+    ) -> String {
+        configuredSocketPath ?? defaultSocketPath(profileID: profileID, fileManager: fileManager)
+    }
+
+    /// Returns the persisted metrics file alongside a resolved socket path.
+    ///
+    /// The path is derived from the same directory as the socket itself; this
+    /// keeps diagnostics from reconstructing a second runtime-path convention.
     package static func defaultMetricsFileURL(
         profileID: String,
+        configuredSocketPath: String? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default
     ) -> URL {
-        URL(filePath: defaultSocketPath(profileID: profileID, fileManager: fileManager))
-            .deletingLastPathComponent()
-            .appending(path: "metrics.json")
+        URL(
+            filePath: resolvedSocketPath(
+                profileID: profileID,
+                configuredSocketPath: configuredSocketPath,
+                fileManager: fileManager
+            )
+        )
+        .deletingLastPathComponent()
+        .appending(path: "metrics.json")
     }
 
-    /// Returns the live cache-events socket path for a stable serve profile.
+    /// Returns the live cache-events socket path alongside a resolved socket path.
     ///
-    /// The path is derived from the same profile directory as
-    /// ``defaultSocketPath(profileID:fileManager:)``; this keeps a tail
-    /// client from reconstructing a second runtime-path convention.
+    /// The path is derived from the same directory as the socket itself; this
+    /// keeps a tail client from reconstructing a second runtime-path convention.
     package static func defaultEventsSocketURL(
         profileID: String,
+        configuredSocketPath: String? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default
     ) -> URL {
-        URL(filePath: defaultSocketPath(profileID: profileID, fileManager: fileManager))
-            .deletingLastPathComponent()
-            .appending(path: XcodeCacheRuntimeDirectory.eventsSocketFileName)
+        URL(
+            filePath: resolvedSocketPath(
+                profileID: profileID,
+                configuredSocketPath: configuredSocketPath,
+                fileManager: fileManager
+            )
+        )
+        .deletingLastPathComponent()
+        .appending(path: XcodeCacheRuntimeDirectory.eventsSocketFileName)
     }
 
-    /// Returns the detached server's process-record file for a stable serve profile.
+    /// Returns the detached server's process-record file alongside a resolved socket path.
     ///
-    /// The path is derived from the same profile directory as
-    /// ``defaultSocketPath(profileID:fileManager:)``; this keeps a stop
-    /// command from reconstructing a second runtime-path convention.
+    /// The path is derived from the same directory as the socket itself; this
+    /// keeps a stop command from reconstructing a second runtime-path convention.
     package static func defaultPIDFileURL(
         profileID: String,
+        configuredSocketPath: String? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default
     ) -> URL {
-        URL(filePath: defaultSocketPath(profileID: profileID, fileManager: fileManager))
-            .deletingLastPathComponent()
-            .appending(path: XcodeCacheRuntimeDirectory.pidFileName)
+        URL(
+            filePath: resolvedSocketPath(
+                profileID: profileID,
+                configuredSocketPath: configuredSocketPath,
+                fileManager: fileManager
+            )
+        )
+        .deletingLastPathComponent()
+        .appending(path: XcodeCacheRuntimeDirectory.pidFileName)
     }
 
-    /// Returns the detached server's redirected stdout/stderr file for a stable serve profile.
+    /// Returns the detached server's redirected stdout/stderr file alongside a resolved socket path.
     ///
-    /// The path is derived from the same profile directory as
-    /// ``defaultSocketPath(profileID:fileManager:)``; this keeps a detach
-    /// launcher from reconstructing a second runtime-path convention.
+    /// The path is derived from the same directory as the socket itself; this
+    /// keeps a detach launcher from reconstructing a second runtime-path convention.
     package static func defaultLogFileURL(
         profileID: String,
+        configuredSocketPath: String? = nil,
         fileManager: any FileManagerProtocolMacOS = FileManager.default
     ) -> URL {
-        URL(filePath: defaultSocketPath(profileID: profileID, fileManager: fileManager))
-            .deletingLastPathComponent()
-            .appending(path: XcodeCacheRuntimeDirectory.logFileName)
+        URL(
+            filePath: resolvedSocketPath(
+                profileID: profileID,
+                configuredSocketPath: configuredSocketPath,
+                fileManager: fileManager
+            )
+        )
+        .deletingLastPathComponent()
+        .appending(path: XcodeCacheRuntimeDirectory.logFileName)
     }
 
     /// Reads and decodes a detached server's process record, if its pidfile exists and parses.

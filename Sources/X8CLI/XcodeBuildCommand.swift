@@ -53,7 +53,10 @@ struct XcodeBuildCommand: X8ExecutableCommand {
                 prefixMapping: prefixMapping,
                 workingDirectory: workingDirectory,
                 responseDirectory: buildArguments.responseDirectory,
-                eventsSocketURL: XcodeServeRunner.defaultEventsSocketURL(profileID: configuration.profileID)
+                eventsSocketURL: XcodeServeRunner.defaultEventsSocketURL(
+                    profileID: configuration.profileID,
+                    configuredSocketPath: configuration.socketPath
+                )
             )
             if let warning = cacheSession.eventsSocketWarning {
                 context.logger.warning(

@@ -7,9 +7,22 @@ struct TailCommand: X8ExecutableCommand {
         abstract: "Stream live cache traffic from a running standalone proxy."
     )
 
+    @Option(
+        name: .long,
+        help: """
+        Fixed cache socket path the server was started with, if it overrode .x8.yml's \
+        socketPath or the per-user default. The events socket is derived alongside it.
+        """
+    )
+    var socketPath: String?
+
     func run(context: X8CommandContext) async throws {
         let configuration = try await context.configuredStorage().configuration
-        let path = XcodeServeRunner.defaultEventsSocketURL(profileID: configuration.profileID).path
+        let configuredSocketPath = socketPath ?? configuration.socketPath
+        let path = XcodeServeRunner.defaultEventsSocketURL(
+            profileID: configuration.profileID,
+            configuredSocketPath: configuredSocketPath
+        ).path
 
         let stream: AsyncThrowingStream<String, any Error>
         do {

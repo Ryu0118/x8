@@ -205,6 +205,18 @@ x8 serve stop
 not exit, and removes its socket and process-record files. It reports success
 even if no detached process was running for the current profile.
 
+> [!WARNING]
+> If your Xcode project has local SwiftPM package dependencies
+> (multi-module apps), the settings above only reach targets defined directly
+> in your `.xcodeproj` — Xcode's `swift-build` engine does not propagate a
+> project's user-defined settings down into targets that belong to a
+> synthesized SwiftPM package project, so package targets never see them and
+> stay uncached under GUI builds. This does not apply if all your app code
+> lives directly in Xcode targets with no local SwiftPM package dependency.
+> `x8 xcodebuild` is unaffected — see
+> [Known limitation: GUI builds with SwiftPM multi-module targets](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#known-limitation-gui-builds-with-swiftpm-multi-module-targets-dont-propagate-user-defined-settings-to-package-targets)
+> for the full explanation.
+
 ## Watching live cache traffic
 
 `x8 tail` connects to a live cache-events socket and prints each cache
@@ -249,6 +261,24 @@ supports `$VAR` expansion.
 | `accessKeyID` | no | Static access key ID. Omit to use the standard AWS credential provider chain. |
 | `secretAccessKey` | no | Static secret access key, paired with `accessKeyID`. Never commit a literal value — use `$VAR` expansion. |
 | `sessionToken` | no | Optional session token for temporary/STS credentials, paired with `accessKeyID`/`secretAccessKey`. |
+| `socketPath` | no | Fixed Unix socket path for the cache proxy, shared by `serve`/`serve stop`/`tail`/`stats`. Must be an absolute path under 104 UTF-8 bytes. Omit to use the per-user default derived from the profile. |
+
+`socketPath` is where `$VAR` expansion earns its keep: commit one path with a
+per-user variable and it resolves consistently on every machine while still
+being a literal, fixed path underneath —
+
+```yaml
+socketPath: ${HOME}/.x8/cache.sock
+```
+
+`x8 serve --socket-path` overrides this for one invocation (and its detached
+child inherits the override); `x8 serve stop`/`x8 tail` accept the same
+option to address a server started that way. `x8 xcodebuild` never takes a
+`--socket-path` option — it always uses its own invocation-scoped temporary
+cache socket, so multiple invocations (and a concurrent `x8 serve`) on the
+same profile keep working side by side, as described above. `.x8.yml`'s
+`socketPath` still applies to its live-events socket, so `x8 tail` can
+observe an `x8 xcodebuild` build's traffic at the pinned location.
 
 `role` is enforced at the storage boundary: a producer's reads return cache
 misses without contacting storage, and a consumer's writes are rejected before
@@ -275,9 +305,10 @@ role: consumer
 | --- | --- |
 | `x8 [xcodebuild] <xcodebuild> [args...]` | Run `xcodebuild` through an embedded, invocation-scoped cache proxy. |
 | `x8 serve` | Run a standalone proxy at a stable socket, for Xcode's GUI or a supervised long-lived process. |
+| `x8 serve --socket-path <path>` | Pin the socket to a fixed path for this invocation, overriding `.x8.yml`'s `socketPath` and the per-user default. |
 | `x8 serve -d` / `--detach` | Run the standalone proxy in the background and return once it is ready. |
-| `x8 serve stop` | Stop a detached `x8 serve -d` process for the current profile. |
-| `x8 tail` | Stream live cache traffic from a running `x8 serve` or `x8 xcodebuild` invocation. |
+| `x8 serve stop` / `x8 serve stop --socket-path <path>` | Stop a detached `x8 serve -d` process for the current profile, or one pinned to a fixed socket path. |
+| `x8 tail` / `x8 tail --socket-path <path>` | Stream live cache traffic from a running `x8 serve` or `x8 xcodebuild` invocation, or one pinned to a fixed socket path. |
 | `x8 config validate` | Validate `.x8.yml` and its resolved values. |
 | `x8 config show` | Print resolved, non-secret configuration. |
 | `x8 doctor` | Check configuration, storage access, and the local proxy in one pass. |

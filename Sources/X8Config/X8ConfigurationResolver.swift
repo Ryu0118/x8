@@ -49,7 +49,8 @@ package struct X8ConfigurationResolver: Sendable {
             region: values.region,
             endpoint: values.endpoint,
             role: values.role,
-            credentials: values.credentials
+            credentials: values.credentials,
+            socketPath: values.socketPath
         )
     }
 
@@ -60,6 +61,7 @@ package struct X8ConfigurationResolver: Sendable {
         let endpoint: URL?
         let role: CacheRole
         let credentials: RemoteCacheCredentials?
+        let socketPath: String?
     }
 
     private static func expand(
@@ -84,6 +86,7 @@ package struct X8ConfigurationResolver: Sendable {
             sessionToken: document.sessionToken,
             expander: &expander
         )
+        let socketPath = try document.socketPath.map { try expander.expand($0) }
 
         return ExpandedValues(
             version: version,
@@ -91,7 +94,8 @@ package struct X8ConfigurationResolver: Sendable {
             region: region,
             endpoint: endpoint,
             role: role,
-            credentials: credentials
+            credentials: credentials,
+            socketPath: socketPath?.isEmpty == true ? nil : socketPath
         )
     }
 
@@ -101,6 +105,26 @@ package struct X8ConfigurationResolver: Sendable {
             throw X8ConfigurationResolutionError.invalidField("region")
         }
         try validatePathComponent(values.bucket, field: "bucket")
+        if let socketPath = values.socketPath {
+            try validateSocketPath(socketPath)
+        }
+    }
+
+    /// Rejects a socket path unusable as a Unix domain socket endpoint.
+    ///
+    /// The kernel's `sockaddr_un.sun_path` on macOS is 104 bytes including the
+    /// terminating NUL, so any path at or beyond 104 UTF-8 bytes cannot be
+    /// bound at all; this is checked after `$VAR` expansion, since that is
+    /// the length the kernel actually sees. A relative path would be resolved
+    /// against whatever directory a command happens to run from instead of a
+    /// fixed team-shared location, defeating the point of pinning it.
+    private static func validateSocketPath(_ socketPath: String) throws {
+        guard socketPath.hasPrefix("/") else {
+            throw X8ConfigurationResolutionError.invalidField("socketPath")
+        }
+        guard socketPath.utf8.count < 104 else {
+            throw X8ConfigurationResolutionError.invalidField("socketPath")
+        }
     }
 
     private static func expandRequiredValue(

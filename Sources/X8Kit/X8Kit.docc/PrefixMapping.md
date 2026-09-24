@@ -113,6 +113,37 @@ cache miss, even though the compiler inputs are otherwise identical. This is
 a known hazard, not something X8's prefix mapping addresses, since prefix
 mapping normalizes paths, not argument ordering.
 
+## Known limitation: GUI builds with SwiftPM multi-module targets don't propagate user-defined settings to package targets
+
+Xcode.app GUI builds add the cache settings from [Enabling the remote
+cache](../../../../README.md#2-xcodeapp-gui-builds) as user-defined build
+settings on a project or `.xcconfig`. Xcode's `swift-build` engine only
+attaches a project's own `.xcconfig`/user-defined settings to that project's
+*own* targets; it does not propagate them down into targets that belong to a
+synthesized SwiftPM package project (a local Swift package your Xcode project
+depends on, with its own `Package.swift`). Concretely: settings attached to
+your `.xcodeproj`/`.xcworkspace` reach targets defined directly in that
+`.xcodeproj`, but **not** targets inside a local Swift package pulled in as a
+dependency — so the cache settings above never reach package targets, and
+`COMPILATION_CACHE_*`/prefix-mapping never turns on for them. This is an
+Xcode `swift-build` settings-propagation limitation that x8 cannot change
+from outside Xcode.
+
+Two ways this plays out in practice:
+
+- **Xcode project has local SwiftPM package dependencies (multi-module app):**
+  package targets do not see the cache settings from GUI builds, so they never
+  get cached this way — only targets defined directly in the `.xcodeproj` do.
+  `x8 xcodebuild` is unaffected, because it supplies the cache settings as CLI
+  overrides (`xcodebuild ... OTHER_SWIFT_FLAGS=...`-style build setting
+  overrides), and `swift-build` already applies CLI overrides to every target
+  unconditionally, package targets included. If your project has SwiftPM
+  package targets and you build from Xcode.app, expect fewer cache hits than
+  the same build run through `x8 xcodebuild`.
+- **Xcode project has no local SwiftPM package dependencies (all app code
+  lives directly in Xcode targets):** this limitation does not apply — every
+  target belongs to the `.xcodeproj` itself, so GUI builds cache normally.
+
 ## Toolchain support
 
 Requires Xcode 27 or later; x8 does not check the Xcode version at runtime.

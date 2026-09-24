@@ -33,6 +33,15 @@ struct ServeCommand: X8ExecutableCommand {
     )
     var workspaceDirectory: String?
 
+    @Option(
+        name: .long,
+        help: """
+        Fixed Unix socket path for the cache proxy, overriding .x8.yml's socketPath and the \
+        per-user default derived from the profile.
+        """
+    )
+    var socketPath: String?
+
     /// Marks this invocation as the detached child spawned by `-d`/`--detach`.
     ///
     /// The value is the fixed descriptor number
@@ -75,7 +84,10 @@ struct ServeCommand: X8ExecutableCommand {
         let configuration = configured.configuration
         try await configured.withStorage { storage in
             let runner = XcodeServeRunner(
-                socketPath: XcodeServeRunner.defaultSocketPath(profileID: configuration.profileID),
+                socketPath: XcodeServeRunner.resolvedSocketPath(
+                    profileID: configuration.profileID,
+                    configuredSocketPath: socketPath ?? configuration.socketPath
+                ),
                 casStore: storage.casStore(role: configuration.role),
                 actionCacheStore: storage.actionCacheStore(role: configuration.role),
                 workingDirectory: Self.workingDirectory(from: workspaceDirectory),
@@ -109,7 +121,11 @@ struct ServeCommand: X8ExecutableCommand {
     private func runDetachedParent(context: X8CommandContext) async throws {
         let configured = try await context.loadConfiguration()
         let profileID = configured.configuration.profileID
-        let logFileURL = XcodeServeRunner.defaultLogFileURL(profileID: profileID)
+        let resolvedSocketPath = socketPath ?? configured.configuration.socketPath
+        let logFileURL = XcodeServeRunner.defaultLogFileURL(
+            profileID: profileID,
+            configuredSocketPath: resolvedSocketPath
+        )
         // The child creates this directory too, once it starts, but the log
         // file must already have somewhere to live before it is spawned.
         try FileManager.default.createDirectory(
@@ -124,6 +140,7 @@ struct ServeCommand: X8ExecutableCommand {
             executablePath: Self.resolvedExecutablePath(),
             arguments: Self.childArguments(
                 workspaceDirectory: workspaceDirectory,
+                socketPath: socketPath,
                 readyFileDescriptor: PosixServeProcessLauncher.readinessFileDescriptor
             ),
             environment: ProcessInfo.processInfo.environment,
@@ -138,7 +155,13 @@ struct ServeCommand: X8ExecutableCommand {
             timeout: .seconds(30),
             signaling: LiveProcessSignaling()
         )
-        try report(outcome, profileID: profileID, logFileURL: logFileURL, context: context)
+        try report(
+            outcome,
+            profileID: profileID,
+            resolvedSocketPath: resolvedSocketPath,
+            logFileURL: logFileURL,
+            context: context
+        )
     }
 
     /// Reports the detached launch's outcome, printing the same cache
@@ -146,12 +169,16 @@ struct ServeCommand: X8ExecutableCommand {
     private func report(
         _ outcome: ServeReadinessOutcome,
         profileID: String,
+        resolvedSocketPath: String?,
         logFileURL: URL,
         context: X8CommandContext
     ) throws {
         switch outcome {
         case .ready:
-            let socketPath = XcodeServeRunner.defaultSocketPath(profileID: profileID)
+            let socketPath = XcodeServeRunner.resolvedSocketPath(
+                profileID: profileID,
+                configuredSocketPath: resolvedSocketPath
+            )
             try Self.writeSettings(
                 socketPath: socketPath,
                 workingDirectory: Self.workingDirectory(from: workspaceDirectory),
@@ -194,10 +221,17 @@ struct ServeCommand: X8ExecutableCommand {
     }
 
     /// Builds the child's `argv`, reusing this invocation's flags plus the hidden readiness marker.
-    private static func childArguments(workspaceDirectory: String?, readyFileDescriptor: Int32) -> [String] {
+    private static func childArguments(
+        workspaceDirectory: String?,
+        socketPath: String?,
+        readyFileDescriptor: Int32
+    ) -> [String] {
         var arguments = ["serve", "--child-ready-fd", String(readyFileDescriptor)]
         if let workspaceDirectory {
             arguments += ["--workspace-directory", workspaceDirectory]
+        }
+        if let socketPath {
+            arguments += ["--socket-path", socketPath]
         }
         return arguments
     }

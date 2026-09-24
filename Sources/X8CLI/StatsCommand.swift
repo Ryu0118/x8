@@ -27,7 +27,10 @@ struct StatsCommand: X8ExecutableCommand {
     ) {
         let configuration = try await context.configuredStorage().configuration
         let snapshot = try await X8CommandSupport.mapped {
-            try await X8CacheStatsRunner().load(profileID: configuration.profileID)
+            try await X8CacheStatsRunner().load(
+                profileID: configuration.profileID,
+                configuredSocketPath: configuration.socketPath
+            )
         }
         return (configuration, snapshot)
     }

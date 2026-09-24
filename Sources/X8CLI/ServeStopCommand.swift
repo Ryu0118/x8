@@ -11,11 +11,27 @@ struct ServeStopCommand: X8ExecutableCommand {
     private static let gracefulShutdownTimeout: Duration = .seconds(10)
     private static let gracefulShutdownPollInterval: Duration = .milliseconds(100)
 
+    @Option(
+        name: .long,
+        help: """
+        Fixed Unix socket path the server was started with, if it overrode .x8.yml's \
+        socketPath or the per-user default.
+        """
+    )
+    var socketPath: String?
+
     func run(context: X8CommandContext) async throws {
         let configured = try await context.configuredStorage()
         let profileID = configured.configuration.profileID
-        let pidFileURL = XcodeServeRunner.defaultPIDFileURL(profileID: profileID)
-        let socketPath = XcodeServeRunner.defaultSocketPath(profileID: profileID)
+        let configuredSocketPath = socketPath ?? configured.configuration.socketPath
+        let pidFileURL = XcodeServeRunner.defaultPIDFileURL(
+            profileID: profileID,
+            configuredSocketPath: configuredSocketPath
+        )
+        let resolvedSocketPath = XcodeServeRunner.resolvedSocketPath(
+            profileID: profileID,
+            configuredSocketPath: configuredSocketPath
+        )
 
         guard let record = XcodeServeRunner.readProcessRecord(at: pidFileURL) else {
             context.logger.info("No detached `x8 serve` process is running for this profile.")
@@ -25,7 +41,7 @@ struct ServeStopCommand: X8ExecutableCommand {
         let livenessProbe = LiveProcessLivenessProbe()
         guard livenessProbe.isAlive(record) else {
             context.logger.info("No detached `x8 serve` process is running for this profile.")
-            Self.cleanUp(pidFileURL: pidFileURL, socketPath: socketPath)
+            Self.cleanUp(pidFileURL: pidFileURL, socketPath: resolvedSocketPath)
             return
         }
 
@@ -34,7 +50,7 @@ struct ServeStopCommand: X8ExecutableCommand {
             livenessProbe: livenessProbe,
             signaling: LiveProcessSignaling(),
             pidFileURL: pidFileURL,
-            socketPath: socketPath
+            socketPath: resolvedSocketPath
         )
         context.logger.info("✅ Stopped the detached `x8 serve` process (pid \(record.pid)).", metadata: .color(.green))
     }

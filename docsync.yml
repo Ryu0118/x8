@@ -16,7 +16,7 @@ rules:
   doc: Sources/X8CLI/X8CLI.docc/ConnectingConfiguration.md
   message: CLI configuration contracts changed - verify configuration ownership and
     validation documentation.
-  checksum: 6357e95d03ee66f05e8fd376ca53ec7763677ce06630eb236de50969bf91211b
+  checksum: efaa13242afc1caf0ceca2206e0e25c9cca6ad49ac0ff2f15108fb077efbb62c
 - name: custom-cli-lifetime
   sources:
   - Sources/X8CLI/X8StorageScope.swift
@@ -27,7 +27,7 @@ rules:
   doc: Sources/X8CLI/X8CLI.docc/StorageLifetime.md
   message: Storage ownership or capabilities changed - verify lifetime and administration
     documentation.
-  checksum: ff5d3b6aafa3a80a035fa4f9ee0dd2ec59aca73634129053111bdf9f88862861
+  checksum: 16fca6b364d5eb679e47c2695ec8596e51a3c36bb603dc6b1dac49252aa3d5ac
 - name: readme-cli
   sources:
   - Sources/X8CLI/XcodeBuildArguments.swift
@@ -43,7 +43,7 @@ rules:
   doc: README.md
   message: CLI command surface changed - update the README Commands table and Enabling
     the remote cache section if commands, flags, or usage changed.
-  checksum: b139d5c4396339c41f549cfb5322a96fa049c4ecaaa1b48c200fc9becac8a692
+  checksum: 3dd32ebaf563e1d901a4313a0a7f16dc1e0a1a7c9a89789f5c85231501068a09
 - name: readme-configuration
   sources:
   - Sources/X8Config/X8ConfigurationDocument.swift
@@ -54,7 +54,7 @@ rules:
   doc: README.md
   message: .x8.yml configuration schema changed - update the README Setup and Configuration
     sections if fields, defaults, or validation changed.
-  checksum: a3538c3f5ae07e4e70e5c06239408019c05ba31516cbce419b610651ae5d57f2
+  checksum: fea1d32836890cba969322d7a2b413ee31ba6b51659ffd496497edcc11ae2d2e
 - name: prefix-mapping
   sources:
   - Sources/X8CLI/XcodeBuildArguments.swift
@@ -64,7 +64,7 @@ rules:
   doc: Sources/X8Kit/X8Kit.docc/PrefixMapping.md
   message: Cache argument or protocol boundaries changed - verify path preservation,
     prefix mapping limits, and the scope of portability claims.
-  checksum: ea78e9d0e227d3be332328a7b1250600e4966c2eda6ba3e33d6db5505e4829a9
+  checksum: 43363af00cd96a1979cd40de962987f07226e3ef0cba90c3402a1bbc8b51ba5d
 excludes:
 - '**/.build/**'
 - .git/**

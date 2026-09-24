@@ -22,6 +22,7 @@ The configuration wrapper carries:
 | `displayFields` | Ordered non-secret key/value pairs printed by `config show`. |
 | `credentialSource` | Authentication mechanism description for diagnostics. |
 | `storageDescription` | Non-secret description of the domain for administration. |
+| `socketPath` | Optional fixed Unix socket path for the cache proxy. |
 
 The CLI never reflects on `value`. Display fields are printed exactly in their
 supplied order; include any common fields you want shown. Supply no secret keys,
@@ -38,6 +39,18 @@ letters, digits, underscores, or hyphens. Configuration construction rejects
 path separators, traversal components, whitespace, and other characters. A
 short digest of a canonical domain representation is suitable; the example
 prefixes its digest with `memory-`.
+
+## Pinning a fixed socket path
+
+Commands that expose a standalone proxy socket (`serve`, `serve stop`, `tail`,
+`stats`) derive a per-user path from `profileID` by default. Supply
+`socketPath` to pin all of them, and the sibling runtime files they derive
+alongside it (events socket, PID file, log file, metrics file), to one fixed
+location instead — for example, so a team can share one socket path across
+machines. It must be an absolute path shorter than 104 UTF-8 bytes
+(`sockaddr_un.sun_path`'s capacity on macOS, including the terminating NUL).
+A CLI command's own `--socket-path` option, where offered, takes precedence
+over this value for that invocation.
 
 ## Command behavior
 

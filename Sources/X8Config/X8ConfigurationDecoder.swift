@@ -89,5 +89,6 @@ struct X8ConfigurationDecoder: Sendable {
         "accessKeyID",
         "secretAccessKey",
         "sessionToken",
+        "socketPath",
     ]
 }

@@ -18,6 +18,14 @@ public struct X8CLIConfiguration<Value: Sendable>: Sendable {
     public let credentialSource: String
     /// A non-secret description of the cache domain used in administrative output.
     public let storageDescription: String
+    /// The optional fixed Unix socket path for the cache proxy.
+    ///
+    /// `nil` unless the caller's configuration pinned one, in which case
+    /// commands that otherwise derive a per-user path from `profileID` use
+    /// this path instead. This is a CLI runtime concern shared across storage
+    /// backends, so it flows through this type alongside `profileID` rather
+    /// than through a storage-specific configuration value.
+    public let socketPath: String?
 
     /// Creates a CLI configuration without opening storage.
     ///
@@ -25,15 +33,22 @@ public struct X8CLIConfiguration<Value: Sendable>: Sendable {
     /// or underscores so callers cannot escape the runtime directory. Include
     /// the storage kind and cache domain in the identity, but exclude secrets
     /// and access roles. Display fields are printed in the supplied order.
+    /// `socketPath`, when supplied, must be an absolute path shorter than 104
+    /// UTF-8 bytes (`sockaddr_un.sun_path`'s capacity on macOS, including the
+    /// terminating NUL).
     public init(
         value: Value,
         profileID: String,
         role: CacheRole = .both,
         displayFields: [(key: String, value: String)] = [],
         credentialSource: String = "unspecified",
-        storageDescription: String = "cache"
+        storageDescription: String = "cache",
+        socketPath: String? = nil
     ) throws {
         try X8ProfileIDValidator.validate(profileID)
+        if let socketPath {
+            try X8SocketPathValidator.validate(socketPath)
+        }
 
         self.value = value
         self.profileID = profileID
@@ -41,6 +56,7 @@ public struct X8CLIConfiguration<Value: Sendable>: Sendable {
         self.displayFields = displayFields
         self.credentialSource = credentialSource
         self.storageDescription = storageDescription
+        self.socketPath = socketPath
     }
 
     func metadata() throws -> X8CLIConfiguration<Void> {
@@ -50,7 +66,8 @@ public struct X8CLIConfiguration<Value: Sendable>: Sendable {
             role: role,
             displayFields: displayFields,
             credentialSource: credentialSource,
-            storageDescription: storageDescription
+            storageDescription: storageDescription,
+            socketPath: socketPath
         )
     }
 }

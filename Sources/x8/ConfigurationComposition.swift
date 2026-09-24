@@ -11,7 +11,8 @@ enum X8ConfigurationComposition {
             role: configuration.role,
             displayFields: X8ConfigurationPresentation.fields(configuration),
             credentialSource: X8ConfigurationPresentation.credentialSource(configuration),
-            storageDescription: "bucket=\(configuration.bucket)"
+            storageDescription: "bucket=\(configuration.bucket)",
+            socketPath: configuration.socketPath
         )
     }
 }

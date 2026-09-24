@@ -32,6 +32,14 @@ package struct X8Configuration: Equatable, Sendable {
     /// The optional literal credentials resolved from configuration.
     package let credentials: RemoteCacheCredentials?
 
+    /// The optional fixed Unix socket path for the cache proxy.
+    ///
+    /// `nil` unless `.x8.yml` set `socketPath`, in which case commands that
+    /// otherwise derive a per-user path from `profileID` use this path
+    /// instead. Excluded from `canonicalProfile`: it names where the socket
+    /// lives, not the cache domain it serves.
+    package let socketPath: String?
+
     /// Creates a remote-cache configuration value without performing validation.
     package init(
         version: Int = 1,
@@ -39,7 +47,8 @@ package struct X8Configuration: Equatable, Sendable {
         region: String = "us-east-1",
         endpoint: URL? = nil,
         role: CacheRole = .both,
-        credentials: RemoteCacheCredentials? = nil
+        credentials: RemoteCacheCredentials? = nil,
+        socketPath: String? = nil
     ) {
         self.version = version
         self.bucket = bucket
@@ -47,6 +56,7 @@ package struct X8Configuration: Equatable, Sendable {
         self.endpoint = endpoint
         self.role = role
         self.credentials = credentials
+        self.socketPath = socketPath
     }
 
     /// A stable identifier for the non-secret profile and cache domain.
