@@ -24,6 +24,8 @@
         /// Models an S3-compatible provider that returns the whole object
         /// regardless of a requested `byteRange`, instead of honoring it.
         var ignoresByteRange = false
+        /// Models a write-only credential that is denied `GetObject`.
+        var deniesGets = false
 
         var objectCount: Int {
             objects.count
@@ -42,6 +44,11 @@
             ignoresBatchPreconditions = value
         }
 
+        /// Makes every `get` throw, modeling a credential without `GetObject`.
+        func setDeniesGets(_ value: Bool) {
+            deniesGets = value
+        }
+
         /// Switches whether `get` honors a requested `byteRange`, modeling a
         /// Range-ignoring S3-compatible provider.
         func setIgnoresByteRange(_ value: Bool) {
@@ -54,6 +61,7 @@
             byteRange: ClosedRange<Int64>?
         ) async throws -> ByteStream? {
             requestedByteRanges.append(byteRange)
+            guard !deniesGets else { throw FakeS3AccessDenied() }
             guard let object = objects["\(bucket)/\(key)"] else { return nil }
             guard let byteRange, !ignoresByteRange else {
                 return TestByteStream.make(object.chunks)
@@ -197,6 +205,8 @@
             }
         }
     }
+
+    struct FakeS3AccessDenied: Error {}
 
     enum TestByteStream {
         static func make(_ chunks: [Data]) -> ByteStream {

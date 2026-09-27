@@ -97,6 +97,23 @@
         }
 
         @Test
+        func writeOnlyCredentialStillPublishesProbeOnce() async throws {
+            let client = FakeS3ObjectClient()
+            await client.setDeniesGets(true)
+            let storage = S3Storage(
+                configuration: .init(api: S3APIConfiguration(bucket: "foo"), publishesReadProbes: true),
+                objectClient: client
+            )
+
+            _ = try await storage.save(TestByteStream.make([Data([0x01])]))
+            _ = try await storage.save(TestByteStream.make([Data([0x02])]))
+
+            #expect(await client.value(for: "cas/_x8-probe") == S3ReadProbePublisher.probeBody)
+            #expect(await client.putCallCount == 3)
+            #expect(await client.requestedByteRanges.count == 1)
+        }
+
+        @Test
         func writerKeepsAnExistingProbe() async {
             let client = FakeS3ObjectClient()
             await client.seed([Data("existing".utf8)], for: "cas/_x8-probe")
