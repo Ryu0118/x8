@@ -103,13 +103,10 @@ mise use -g github:Ryu0118/x8
      write: api
    ```
 
-2. Provide credentials. `source: defaultChain` uses the standard AWS credential
-   provider chain: environment variables, the `~/.aws` credentials and config
-   files (including `AWS_PROFILE` and `role_arn`), `aws sso login`, then
-   `aws login`. `source: static` takes explicit keys; for
-   R2, create S3 API credentials for your bucket. Every value in `.x8.yml`
-   supports POSIX-style `$VAR`/`${VAR}` expansion against the process
-   environment, so keys can be committed by reference:
+2. Provide credentials. `source: defaultChain` uses your existing AWS setup
+   (for example `aws configure` or `aws sso login`). To use explicit keys
+   instead, such as R2 API tokens, put this under `s3.api` and pass the values
+   through environment variables:
 
    ```yaml
        credentials:
@@ -118,9 +115,9 @@ mise use -g github:Ryu0118/x8
          secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
    ```
 
-   Never commit a *literal* secret value to `.x8.yml`; `$VAR` references are
-   fine. Machines that only read can skip credentials entirely by reading from
-   a public URL. See [Configuring x8 with .x8.yml](https://ryu0118.github.io/x8/documentation/x8config/configurationfile).
+   Never commit a literal secret value. See [Configuring x8 with
+   .x8.yml](https://ryu0118.github.io/x8/documentation/x8config/configurationfile)
+   for every option.
 
 3. Confirm everything is wired up:
 
