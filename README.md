@@ -7,8 +7,6 @@
 [![Swift](https://img.shields.io/badge/Swift-6.1-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![Platform](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey)](https://developer.apple.com/macos/)
 
-**[Full API documentation →](https://ryu0118.github.io/x8/documentation/x8kit/)**
-
 Xcode already caches compiled Swift/Clang modules, but that cache lives on
 each machine: a module built on one Mac is built again on every other Mac and
 CI runner. x8 lets a team share one cache instead. It speaks Xcode's cache
@@ -18,12 +16,12 @@ compiles, every other machine can download instead of rebuilding.
 
 ## Features
 
-- 🚝 **Shared remote cache** — Share one compilation cache across your team's
+- 🚝 **Shared remote cache:** Share one compilation cache with your team across
   Macs and CI runners instead of rebuilding the same modules everywhere.
-- ⚙️ **Drop-in `xcodebuild` proxy** — Wrap `xcodebuild` with `x8 xcodebuild`, or
+- ⚙️ **Drop-in `xcodebuild` proxy:** Wrap `xcodebuild` with `x8 xcodebuild`, or
   run a standalone proxy with `x8 serve` for Xcode.app GUI builds.
-- 🔌 **Any S3-compatible provider** — AWS S3, Cloudflare R2, MinIO, or your own;
-  no backend lock-in.
+- 🔌 **Any S3-compatible provider:** AWS S3, Cloudflare R2, MinIO, or another
+  provider, without backend lock-in.
 
 ## Table of Contents
 
@@ -49,14 +47,14 @@ compiles, every other machine can download instead of rebuilding.
 A handful of build settings point Xcode's Compilation Cache plugin at a local
 socket. x8 listens on that socket, speaks the gRPC protocol the plugin
 expects, and translates each cache lookup or upload into a read or write of
-one object in your bucket (an S3 `GetObject` or `PutObject` request, which is
-why any S3-compatible provider works).
+one object in your bucket using an S3 `GetObject` or `PutObject` request. That
+is why any S3-compatible provider works.
 
 ## Installation
 
 x8 needs Xcode 27 or later (which itself requires macOS 26) and an
-S3-compatible bucket — AWS S3, Cloudflare R2, MinIO, or similar. That is all
-you need to get started.
+S3-compatible bucket such as AWS S3, Cloudflare R2, or MinIO. That is all you
+need to get started.
 
 ### Nest ([mtj0928/nest](https://github.com/mtj0928/nest))
 
@@ -72,31 +70,39 @@ mise use -g github:Ryu0118/x8
 
 ## Quick Start
 
-1. Create `.x8.yml` at your project root:
+1. Create `.x8.yml` at your project root. For AWS S3, the bucket name is enough:
 
    ```yaml
    version: 1
    bucket: my-team-cache
-   # endpoint is optional for AWS S3 — omit it entirely and x8 uses AWS's
-   # default endpoint. Set it only for an S3-compatible provider. For R2,
-   # replace abc123 with your Cloudflare account ID (shown in the R2
-   # dashboard next to the bucket's S3 API URL):
-   endpoint: https://abc123.r2.cloudflarestorage.com
    ```
 
-2. Provide credentials. Every field in `.x8.yml` supports POSIX-style
-   `$VAR`/`${VAR}` expansion against the process environment, so static
-   credentials can be committed by reference:
+   For Cloudflare R2, add its S3 endpoint and signing region. Replace
+   `YOUR_ACCOUNT_ID` with your Cloudflare account ID. See [Cloudflare's R2 S3
+   API guide](https://developers.cloudflare.com/r2/api/s3/api/) for endpoint
+   and credential setup details:
+
+   ```yaml
+   version: 1
+   bucket: my-team-cache
+   region: auto
+   endpoint: https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com
+   ```
+
+2. Provide credentials. For R2, create S3 API credentials for your bucket.
+   Every field in `.x8.yml` supports POSIX-style `$VAR`/`${VAR}` expansion
+   against the process environment, so static credentials can be committed by
+   reference:
 
    ```yaml
    accessKeyID: ${AWS_ACCESS_KEY_ID}
    secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
    ```
 
-   Without static credentials, x8 uses the standard AWS credential provider
-   chain (environment, shared config file, SSO, `AssumeRole`,
-   container/instance metadata) — nothing to configure. Never commit a
-   *literal* secret value to `.x8.yml`; `$VAR` references are fine.
+   For AWS, omit static credentials and x8 uses the standard AWS credential
+   provider chain (environment, shared config file, SSO, `AssumeRole`, and
+   container or instance metadata). Never commit a *literal* secret value to
+   `.x8.yml`; `$VAR` references are fine.
 
 3. Confirm everything is wired up:
 
@@ -110,9 +116,9 @@ mise use -g github:Ryu0118/x8
    x8 xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
    ```
 
-   That's all a command-line build needs. Building from Xcode.app
-   instead uses a long-running `x8 serve` plus a few build settings — see
-   [Xcode.app GUI builds](#2-xcodeapp-gui-builds) below.
+   That's all a command-line build needs. Building from Xcode.app uses a
+   long-running `x8 serve` plus a few build settings. See [Xcode.app GUI
+   builds](#2-xcodeapp-gui-builds) below.
 
 ## Enabling the remote cache
 
@@ -208,41 +214,20 @@ not exit, and removes its socket and process-record files. It reports success
 even if no detached process was running for the current profile.
 
 > [!WARNING]
-> If your Xcode project has local SwiftPM package dependencies
-> (multi-module apps), the settings above only reach targets defined directly
-> in your `.xcodeproj` — Xcode's `swift-build` engine does not propagate a
-> project's user-defined settings down into targets that belong to a
-> synthesized SwiftPM package project, so package targets never see them and
-> stay uncached under GUI builds. This does not apply if all your app code
-> lives directly in Xcode targets with no local SwiftPM package dependency.
-> `x8 xcodebuild` is unaffected — see
+> With local SwiftPM package dependencies, these settings only reach targets
+> defined directly in your `.xcodeproj`. Xcode's `swift-build` engine does not
+> propagate project settings to synthesized package targets, so those targets
+> remain uncached in GUI builds. This does not affect apps without local
+> package dependencies or builds through `x8 xcodebuild`. See
 > [Known limitation: GUI builds with SwiftPM multi-module targets](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#known-limitation-gui-builds-with-swiftpm-multi-module-targets-dont-propagate-user-defined-settings-to-package-targets)
-> for the full explanation.
+> for details.
 
 ## Watching live cache traffic
 
-`x8 tail` connects to a live cache-events socket and prints each cache
-request as it happens. Both `x8 serve` and `x8 xcodebuild` open this socket,
-so `x8 tail` works against either — there is nothing else to configure.
-`x8 serve` streams the same traffic to its own terminal directly, without
-dialing that socket, so it stays visible even if the socket fails to bind.
-
-The socket's identity comes from the *profile ID*, a hash of `.x8.yml`'s
-`version`, `endpoint`, `region`, and `bucket`, not from the directory you run
-x8 in. Two projects pointed at the same bucket/endpoint/region share one
-profile ID and one events socket; the same project run from two different
-directories also shares it. This is why `x8 tail` needs no arguments to find
-the right socket: it derives the same profile ID from the current directory's
-`.x8.yml` and connects to the matching path.
-
-Only one process can own the events socket for a given profile ID at a time.
-Binding is fail-open and attempted once, at startup: whichever of `x8 serve`
-or `x8 xcodebuild` starts first keeps the socket for its entire run, and the
-other's cache traffic stays invisible to `x8 tail` for that whole run, even
-after the first process exits and frees the socket. If you run both against
-the same profile — for example, a long-lived `x8 serve` alongside an
-`x8 xcodebuild` invocation for the same project — start `x8 serve` first so
-`x8 tail` can observe both.
+`x8 tail` subscribes to the live cache-events socket and prints cache
+requests as they happen. Run it in another terminal from the project root
+while `x8 xcodebuild` is running. `x8 serve` prints its own live traffic in
+the terminal where it runs.
 
 ## Configuration
 
@@ -259,15 +244,15 @@ supports `$VAR` expansion.
 | `bucket` | yes | The S3 bucket name. |
 | `region` | no | AWS region or provider-specific signing region. Defaults to `us-east-1`. |
 | `endpoint` | no | Custom endpoint for an S3-compatible provider (e.g. R2). Omit for AWS S3. |
-| `role` | no | What this machine may do with the cache: `producer` (write only — uploads, never downloads), `consumer` (read only — downloads, never uploads), or `both` (read and write). Defaults to `both`. |
+| `role` | no | What this machine may do with the cache: `producer` (write only, uploads but never downloads), `consumer` (read only, downloads but never uploads), or `both` (read and write). Defaults to `both`. |
 | `accessKeyID` | no | Static access key ID. Omit to use the standard AWS credential provider chain. |
-| `secretAccessKey` | no | Static secret access key, paired with `accessKeyID`. Never commit a literal value — use `$VAR` expansion. |
+| `secretAccessKey` | no | Static secret access key, paired with `accessKeyID`. Never commit a literal value. Use `$VAR` expansion. |
 | `sessionToken` | no | Optional session token for temporary/STS credentials, paired with `accessKeyID`/`secretAccessKey`. |
 | `socketPath` | no | Fixed Unix socket path for the cache proxy, shared by `serve`/`serve stop`/`tail`/`stats`. Must be an absolute path under 104 UTF-8 bytes. Omit to use the per-user default derived from the profile. |
 
 `socketPath` is where `$VAR` expansion earns its keep: commit one path with a
 per-user variable and it resolves consistently on every machine while still
-being a literal, fixed path underneath —
+while the resolved path stays fixed for each user:
 
 ```yaml
 socketPath: ${HOME}/.x8/cache.sock
@@ -275,9 +260,9 @@ socketPath: ${HOME}/.x8/cache.sock
 
 `x8 serve --socket-path` overrides this for one invocation (and its detached
 child inherits the override); `x8 serve stop`/`x8 tail` accept the same
-option to address a server started that way. `x8 xcodebuild` never takes a
-`--socket-path` option — it always uses its own invocation-scoped temporary
-cache socket, so multiple invocations (and a concurrent `x8 serve`) on the
+option to address a server started that way. `x8 xcodebuild` has no
+`--socket-path` option. It always uses its own invocation-scoped temporary
+cache socket, so multiple invocations and a concurrent `x8 serve` on the
 same profile keep working side by side, as described above. `.x8.yml`'s
 `socketPath` still applies to its live-events socket, so `x8 tail` can
 observe an `x8 xcodebuild` build's traffic at the pinned location.
@@ -287,7 +272,7 @@ misses without contacting storage, and a consumer's writes are rejected before
 reaching storage. The role does not change where the cache lives, so a producer
 job and a consumer laptop reading the same `.x8.yml` still share the same cache.
 A single shared `role: both` in `.x8.yml` is often enough. Split it into
-`.x8.local.yml` overlays only when specific machines need to be restricted —
+`.x8.local.yml` overlays only when specific machines need to be restricted,
 typically CI runners that populate the cache as `producer` and developer
 machines that only pull from it as `consumer`:
 
