@@ -1,19 +1,21 @@
 #!/bin/bash
 # Renders Mermaid diagram sources into DocC catalog resources and README assets.
 #
-# DocC does not render ```mermaid fenced code blocks, so diagram sources live
-# as .mmd files under <catalog>.docc/Diagrams/ and are pre-rendered here into
-# <catalog>.docc/Resources/ before `swift package generate-documentation`.
+# Neither DocC nor GitHub's view of a .docc article renders ```mermaid blocks,
+# so diagram sources live as .mmd files under <catalog>.docc/Diagrams/ and are
+# pre-rendered here into the catalog root, next to the articles.
 #
-# Convention: Diagrams/<name>.mmd renders to Resources/<name>.svg (light) and
-# Resources/<name>~dark.svg (dark). Articles reference the image by base name:
-#   ![alt text](<name>)
+# Convention: Diagrams/<name>.mmd renders to <catalog>.docc/<name>.svg (light)
+# and <name>~dark.svg (dark). Articles reference the file name with extension:
+#   ![alt text](<name>.svg)
+# GitHub resolves that path relative to the article; DocC finds the file by
+# name anywhere in the catalog and pairs it with the ~dark variant. A
+# subdirectory path such as Resources/<name>.svg breaks DocC's lookup.
 #
-# Rendered DocC SVGs are gitignored; run this script before building docs
-# locally. The top-level Diagrams/ directory holds README diagrams, rendered
-# in place with the same convention. Those SVGs are committed because nothing
-# renders them for GitHub's README view; re-run this script after editing a
-# README .mmd source and commit the result.
+# The top-level Diagrams/ directory holds README diagrams, rendered in place
+# with the same convention. All rendered SVGs are committed because nothing
+# renders them for GitHub; re-run this script after editing any .mmd source
+# and commit the result.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -68,7 +70,7 @@ render_diagrams() {
 
 for diagrams_dir in "$ROOT"/Sources/*/*.docc/Diagrams; do
   [ -d "$diagrams_dir" ] || continue
-  render_diagrams "$diagrams_dir" "$(dirname "$diagrams_dir")/Resources"
+  render_diagrams "$diagrams_dir" "$(dirname "$diagrams_dir")"
 done
 
 if [ -d "$ROOT/Diagrams" ]; then

@@ -49,7 +49,7 @@ concepts:
   CASObject to an output CASObject with their CASIDs". The key identifies a
   compilation action; the value points at its cached outputs.
 
-![Action Cache maps an opaque key to small value entries; CAS maps an opaque CASDataID to a CASObject (blob plus references) or CASBlob (blob only), and Action Cache value entries carry CAS IDs into the CAS side.](cache-record-shapes)
+![Action Cache maps an opaque key to small value entries; CAS maps an opaque CASDataID to a CASObject (blob plus references) or CASBlob (blob only), and Action Cache value entries carry CAS IDs into the CAS side.](cache-record-shapes.svg)
 
 The two services are deliberately different shapes:
 
@@ -92,7 +92,7 @@ tree of CAS objects, and the action-cache value points at the root. Apple
 does not document the node layout; the diagram shows the shape the protocol
 permits.
 
-![An Action Cache key resolves to a value whose entry points at a root CASObject; the root references object-code, diagnostics, dependency-record, and precompiled-module CASObjects, which in turn reference raw CASBlob leaves.](cas-object-graph)
+![An Action Cache key resolves to a value whose entry points at a root CASObject; the root references object-code, diagnostics, dependency-record, and precompiled-module CASObjects, which in turn reference raw CASBlob leaves.](cas-object-graph.svg)
 
 Three properties follow from content addressing:
 
@@ -112,7 +112,7 @@ same action on another machine. The client is the CAS plugin loaded by the
 Xcode toolchain; which process holds the socket connection is not documented
 and does not affect the protocol.
 
-![A miss path (GetValue KEY_NOT_FOUND, compile, Save and Put the result, PutValue) followed by a hit path on another machine (GetValue SUCCESS, Get and Load reuse the cached CAS objects, compiler not run) and an error path (GetValue ERROR, compile locally, build continues).](build-sequence)
+![A miss path (GetValue KEY_NOT_FOUND, compile, Save and Put the result, PutValue) followed by a hit path on another machine (GetValue SUCCESS, Get and Load reuse the cached CAS objects, compiler not run) and an error path (GetValue ERROR, compile locally, build continues).](build-sequence.svg)
 
 Notes on the diagram:
 
@@ -130,7 +130,7 @@ Notes on the diagram:
 X8 is a protocol adapter. Each layer knows only the layer below it, and the
 opaque identifiers pass through every layer unchanged.
 
-![Xcode connects over gRPC to X8Kit's server, whose CAS and Action Cache services delegate to X8Storage's provider-neutral CASStore/ActionCacheStore boundary, which X8S3 maps onto S3 keys and a versioned envelope in the bucket.](protocol-adapter-layers)
+![Xcode connects over gRPC to X8Kit's server, whose CAS and Action Cache services delegate to X8Storage's provider-neutral CASStore/ActionCacheStore boundary, which X8S3 maps onto S3 keys and a versioned envelope in the bucket.](protocol-adapter-layers.svg)
 
 Responsibilities per layer:
 
@@ -157,7 +157,7 @@ Responsibilities per layer:
 Both entry points run the same server; they differ in who owns the socket and
 for how long. <doc:XcodeCacheRuntime> describes the lifecycle mechanics.
 
-![x8 xcodebuild starts a private socket for one invocation and removes it on exit; x8 serve starts a stable per-profile socket that any number of builds can reuse until it is stopped by signal or shutdown.](socket-lifecycles)
+![x8 xcodebuild starts a private socket for one invocation and removes it on exit; x8 serve starts a stable per-profile socket that any number of builds can reuse until it is stopped by signal or shutdown.](socket-lifecycles.svg)
 
 | | `x8 xcodebuild` | `x8 serve` |
 | --- | --- | --- |

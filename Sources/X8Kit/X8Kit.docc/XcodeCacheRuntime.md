@@ -22,7 +22,7 @@ Both runtime modes use the same server lifecycle:
 5. The caller retains the session or handle, uses the socket, and eventually
    requests graceful shutdown or waits for the server to stop naturally.
 
-![Startup moves from preparing the directory through serving and waiting for the socket to appear, then protecting it with restrictive permissions before reaching ready; any failure in that path moves to startup-failed and drains. From ready, shutdown or a transport failure moves to draining and then terminates.](server-lifecycle-states)
+![Startup moves from preparing the directory through serving and waiting for the socket to appear, then protecting it with restrictive permissions before reaching ready; any failure in that path moves to startup-failed and drains. From ready, shutdown or a transport failure moves to draining and then terminates.](server-lifecycle-states.svg)
 
 If startup fails, the coordinator requests a graceful stop, awaits the serving
 task, removes the socket, and rethrows the original error. After readiness,
@@ -50,7 +50,7 @@ identifiers; changing the socket path does not rename cache records.
 
 ## Protocol and storage boundary
 
-![Xcode requests flow over the Unix-domain socket into the protocol adapter, where KeyValueDB messages map to the ActionCacheStore and CASDBService messages map to the CASStore, both backed by the configured storage backend.](xcode-cache-boundary)
+![Xcode requests flow over the Unix-domain socket into the protocol adapter, where KeyValueDB messages map to the ActionCacheStore and CASDBService messages map to the CASStore, both backed by the configured storage backend.](xcode-cache-boundary.svg)
 
 The protocol adapter translates `CASDBService` and `KeyValueDB` messages into
 `X8Storage.CASStore` and `X8Storage.ActionCacheStore` operations. A missing record is a cache

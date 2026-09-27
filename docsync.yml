@@ -97,4 +97,3 @@ excludes:
 - '**/node_modules/**'
 - docs/**
 - .superpowers/**
-- Sources/*/*.docc/Resources/**
