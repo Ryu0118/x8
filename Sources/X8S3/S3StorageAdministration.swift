@@ -7,7 +7,7 @@
     extension S3Storage: CacheAdministration, CASReferenceReader {
         /// Lists one X8 cache namespace as revision-bearing observations.
         public func listObjects(of kind: CacheObjectKind) async throws -> [CacheObject] {
-            let metadata = try await requiredAPI(for: "Cache administration").list(prefix: keySpace.prefix(for: kind))
+            let metadata = try await requiredAPI(for: .administration).list(prefix: keySpace.prefix(for: kind))
             // Provider listings can contain unrelated keys; only exact, parseable X8 keys become purge candidates.
             return metadata.compactMap { object in
                 guard let identifier = keySpace.identifier(
@@ -37,7 +37,7 @@
             guard keySpace.matches(object) else {
                 return .revisionChanged
             }
-            let result = try await requiredAPI(for: "Cache administration").delete(
+            let result = try await requiredAPI(for: .administration).delete(
                 key: object.key,
                 revision: String(decoding: revision.rawValue, as: UTF8.self)
             )
@@ -58,11 +58,12 @@
             let verified = objects.compactMap(deletionCandidate(for:))
             let preSkippedCount = objects.count - verified.count
 
+            let api = try requiredAPI(for: .administration)
             let chunks = verified.chunked(by: S3BatchDeleteLimits.maximumKeysPerRequest)
             let batchResults = try await chunks.asyncMap(
                 numberOfConcurrentTasks: UInt(max(1, chunks.count))
             ) { chunk in
-                try await self.requiredAPI(for: "Cache administration").deleteObjects(chunk)
+                try await api.deleteObjects(chunk)
             }
 
             let deletedCount = batchResults.reduce(0) { $0 + $1.deletedKeys.count }
@@ -90,7 +91,7 @@
         /// surface as a remote error, since the object genuinely exists.
         public func references(of id: CASDataID) async throws -> [CASDataID]? {
             let range = Int64.zero ... (S3StorageCodec.recommendedHeaderReadBytes - 1)
-            guard let stream = try await requiredAPI(for: "Cache administration").get(
+            guard let stream = try await requiredAPI(for: .administration).get(
                 key: keySpace.cas(id: id.rawValue),
                 byteRange: range
             ) else { return nil }
@@ -120,10 +121,11 @@
 
         /// Falls back to a full read when the ranged header prefix may be truncated.
         private func referencesFromFullRecord(id: CASDataID) async throws -> [CASDataID]? {
-            guard let record = try await getCASRecord(
-                id: id,
-                via: requiredAPI(for: "Cache administration")
-            ) else { return nil }
+            // Administration reads through the signed API so purge never depends on public access.
+            guard let stream = try await requiredAPI(for: .administration).get(key: keySpace.cas(id: id.rawValue)) else {
+                return nil
+            }
+            let record = try await S3StorageCodec.decodeCASHeader(from: stream)
             try await ByteStreamSupport.discard(record.bytes)
             return record.references
         }

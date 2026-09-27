@@ -8,17 +8,7 @@
 
     @Suite("S3 public-URL reads stay unsigned and keep misses distinct from denials")
     struct S3PublicReadTests {
-        private static let baseURL = "https://cache.example.com/team-cache/"
-
-        private static func publicOnlyStorage(
-            transport: FakePublicHTTPTransport
-        ) throws -> S3Storage {
-            try S3Storage(
-                configuration: .init(api: nil, publicReadURL: #require(URL(string: baseURL))),
-                objectClient: nil,
-                publicTransport: transport
-            )
-        }
+        private static let baseURL = PublicReadFixture.baseURL
 
         @Test
         func readsCASObjectFromPublicURL() async throws {
@@ -27,7 +17,7 @@
             let references = [CASDataID(rawValue: Data([0xBB]))]
             let envelope = S3StorageCodec.encodeCAS(S3CASRecord(bytes: Data([0x01, 0x02]), references: references))
             await transport.respond(to: Self.baseURL + "cas/aa", status: 200, body: envelope)
-            let storage = try Self.publicOnlyStorage(transport: transport)
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: transport)
 
             let object = try #require(try await storage.get(id: id))
 
@@ -44,7 +34,7 @@
                 status: 200,
                 body: S3StorageCodec.encodeActionCache(value)
             )
-            let storage = try Self.publicOnlyStorage(transport: transport)
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: transport)
 
             let loaded = try await storage.getValue(for: ActionCacheKey(rawValue: Data([0x01])))
 
@@ -55,7 +45,7 @@
         func treatsNotFoundAsCacheMiss() async throws {
             let transport = FakePublicHTTPTransport()
             await transport.respond(to: Self.baseURL + "cas/aa", status: 404)
-            let storage = try Self.publicOnlyStorage(transport: transport)
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: transport)
 
             let object = try await storage.get(id: CASDataID(rawValue: Data([0xAA])))
 
@@ -66,7 +56,7 @@
         func throwsForbiddenInsteadOfReportingAMiss() async throws {
             let transport = FakePublicHTTPTransport()
             await transport.respond(to: Self.baseURL + "action-cache/01", status: 403)
-            let storage = try Self.publicOnlyStorage(transport: transport)
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: transport)
 
             await #expect(throws: S3PublicReadError.self) {
                 _ = try await storage.getValue(for: ActionCacheKey(rawValue: Data([0x01])))
@@ -77,7 +67,7 @@
         func throwsUnexpectedStatus() async throws {
             let transport = FakePublicHTTPTransport()
             await transport.respond(to: Self.baseURL + "cas/aa", status: 500)
-            let storage = try Self.publicOnlyStorage(transport: transport)
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: transport)
 
             await #expect(throws: S3PublicReadError.unexpectedStatus(key: "cas/aa", status: 500)) {
                 _ = try await storage.load(id: CASDataID(rawValue: Data([0xAA])))
@@ -86,9 +76,9 @@
 
         @Test
         func rejectsWritesWithoutSignedAPI() async throws {
-            let storage = try Self.publicOnlyStorage(transport: FakePublicHTTPTransport())
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: FakePublicHTTPTransport())
 
-            await #expect(throws: S3APINotConfiguredError(operation: "Cache writes")) {
+            await #expect(throws: S3APINotConfiguredError(operation: .writes)) {
                 try await storage.putValue(
                     ActionCacheValue(entries: [:]),
                     for: ActionCacheKey(rawValue: Data([0x01]))
@@ -98,9 +88,9 @@
 
         @Test
         func rejectsAdministrationWithoutSignedAPI() async throws {
-            let storage = try Self.publicOnlyStorage(transport: FakePublicHTTPTransport())
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: FakePublicHTTPTransport())
 
-            await #expect(throws: S3APINotConfiguredError(operation: "Cache administration")) {
+            await #expect(throws: S3APINotConfiguredError(operation: .administration)) {
                 _ = try await storage.listObjects(of: .cas)
             }
         }

@@ -32,7 +32,7 @@
         /// listing and subsequent reads are not atomic; without complete,
         /// valid observations, CAS purge must fail closed.
         public func retentionSnapshot() async throws -> CASRetentionSnapshot {
-            let metadata = try await requiredAPI(for: "Cache retention").list(prefix: keySpace.retentionPrefix)
+            let metadata = try await requiredAPI(for: .retention).list(prefix: keySpace.retentionPrefix)
             let markerKey = keySpace.authorityMarkerKey
             let hasAuthorityMarker = try await authorityMarkerExists(at: markerKey)
             let documents = try await retentionDocuments(
@@ -51,16 +51,17 @@
         /// The anchor document and authority marker are kept in the retention
         /// namespace, separate from Action Cache and CAS objects.
         public func putRetentionAnchor(_ anchor: CASRetentionAnchor) async throws {
+            let api = try requiredAPI(for: .retention)
             let data = try S3RetentionCodec.encode(anchor)
             let key = keySpace.retention(identifier: anchor.identifier)
-            try await requiredAPI(for: "Cache retention").put(
+            try await api.put(
                 key: key,
                 body: ByteStreamSupport.make(data),
                 contentLength: Int64(data.count)
             )
 
             let markerKey = keySpace.authorityMarkerKey
-            try await requiredAPI(for: "Cache retention").put(
+            try await api.put(
                 key: markerKey,
                 body: ByteStreamSupport.make(S3RetentionCodec.authorityMarker),
                 contentLength: Int64(S3RetentionCodec.authorityMarker.count)
@@ -75,7 +76,7 @@
         ) async throws -> CacheDeleteResult {
             guard let revision = anchor.revision else { return .revisionChanged }
             let key = keySpace.retention(identifier: anchor.identifier)
-            let result = try await requiredAPI(for: "Cache retention").delete(
+            let result = try await requiredAPI(for: .retention).delete(
                 key: key,
                 revision: String(decoding: revision.rawValue, as: UTF8.self)
             )
@@ -152,7 +153,7 @@
         }
 
         private func objectData(at key: String, maximumBytes: Int) async throws -> Data? {
-            guard let stream = try await requiredAPI(for: "Cache retention").get(key: key) else {
+            guard let stream = try await requiredAPI(for: .retention).get(key: key) else {
                 return nil
             }
             return try await ByteStreamSupport.collect(

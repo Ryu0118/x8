@@ -1,5 +1,6 @@
 #if X8_S3
     import Foundation
+    import Testing
     @testable import X8S3
 
     /// Serves canned unsigned responses by URL and records every request.
@@ -17,6 +18,19 @@
             return S3PublicHTTPResponse(
                 status: response.status,
                 body: TestByteStream.make([response.body])
+            )
+        }
+    }
+
+    /// Shared fixtures for public-URL read tests.
+    enum PublicReadFixture {
+        static let baseURL = "https://cache.example.com/team-cache/"
+
+        static func publicOnlyStorage(transport: FakePublicHTTPTransport) throws -> S3Storage {
+            try S3Storage(
+                configuration: .init(api: nil, publicReadURL: #require(URL(string: baseURL))),
+                objectClient: nil,
+                publicTransport: transport
             )
         }
     }

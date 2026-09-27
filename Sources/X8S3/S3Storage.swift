@@ -148,7 +148,9 @@
         }
 
         /// Returns the signed API store, or throws when this profile has none.
-        package nonisolated func requiredAPI(for operation: String) throws -> S3APIObjectStore {
+        package nonisolated func requiredAPI(
+            for operation: S3APINotConfiguredError.Operation
+        ) throws -> S3APIObjectStore {
             guard let api else { throw S3APINotConfiguredError(operation: operation) }
             return api
         }
@@ -193,7 +195,7 @@
 
         /// Replaces the action-cache value for a key.
         package func putValue(_ value: ActionCacheValue, for key: ActionCacheKey) async throws {
-            let api = try requiredAPI(for: "Cache writes")
+            let api = try requiredAPI(for: .writes)
             let dedupeKey = ActionCacheDedupeKey(key: key, value: value)
             try await actionCacheDeduplicator.withDeduplication(key: dedupeKey) { [api, keySpace] in
                 let data = S3StorageCodec.encodeActionCache(value)
@@ -212,14 +214,10 @@
         }
 
         /// Reads the provider envelope and returns references plus a lazy payload stream.
-        ///
-        /// Xcode-path reads use the configured reader; administration passes
-        /// the signed API store so purge never depends on public access.
         package func getCASRecord(
-            id: CASDataID,
-            via reader: (any S3ObjectReader)? = nil
+            id: CASDataID
         ) async throws -> (references: [CASDataID], bytes: ByteStream)? {
-            guard let stream = try await (reader ?? self.reader).get(
+            guard let stream = try await reader.get(
                 key: keySpace.cas(id: id.rawValue),
                 kind: .cas
             ) else { return nil }
@@ -230,7 +228,7 @@
             bytes: ByteStream,
             references: [CASDataID]
         ) async throws -> CASDataID {
-            let api = try requiredAPI(for: "Cache writes")
+            let api = try requiredAPI(for: .writes)
             // The staged file makes the generated key deterministic and lets a retry replay the body.
             let staged = try await S3CASUpload.stage(
                 bytes,

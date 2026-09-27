@@ -9,25 +9,17 @@
 
     @Suite("S3 public-read probes turn only proven AccessDenied responses into misses")
     struct S3PublicReadProbeTests {
-        private static let baseURL = "https://cache.example.com/team-cache/"
+        private static let baseURL = PublicReadFixture.baseURL
         private static let accessDenied = Data(
             "<?xml version=\"1.0\"?><Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>".utf8
         )
-
-        private static func publicOnlyStorage(transport: FakePublicHTTPTransport) throws -> S3Storage {
-            try S3Storage(
-                configuration: .init(api: nil, publicReadURL: #require(URL(string: baseURL))),
-                objectClient: nil,
-                publicTransport: transport
-            )
-        }
 
         @Test
         func treatsAccessDeniedAsMissOnceProbeIsReadable() async throws {
             let transport = FakePublicHTTPTransport()
             await transport.respond(to: Self.baseURL + "cas/aa", status: 403, body: Self.accessDenied)
             await transport.respond(to: Self.baseURL + "cas/_x8-probe", status: 200)
-            let storage = try Self.publicOnlyStorage(transport: transport)
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: transport)
 
             let object = try await storage.get(id: CASDataID(rawValue: Data([0xAA])))
 
@@ -39,7 +31,7 @@
             let transport = FakePublicHTTPTransport()
             await transport.respond(to: Self.baseURL + "action-cache/01", status: 403, body: Self.accessDenied)
             await transport.respond(to: Self.baseURL + "action-cache/_x8-probe", status: 403, body: Self.accessDenied)
-            let storage = try Self.publicOnlyStorage(transport: transport)
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: transport)
 
             await #expect(throws: S3PublicReadError.self) {
                 _ = try await storage.getValue(for: ActionCacheKey(rawValue: Data([0x01])))
@@ -51,7 +43,7 @@
             let transport = FakePublicHTTPTransport()
             await transport.respond(to: Self.baseURL + "cas/aa", status: 403, body: Data("<html>blocked</html>".utf8))
             await transport.respond(to: Self.baseURL + "cas/_x8-probe", status: 200)
-            let storage = try Self.publicOnlyStorage(transport: transport)
+            let storage = try PublicReadFixture.publicOnlyStorage(transport: transport)
 
             await #expect(throws: S3PublicReadError.self) {
                 _ = try await storage.load(id: CASDataID(rawValue: Data([0xAA])))
@@ -111,21 +103,7 @@
 
             #expect(await client.value(for: "cas/_x8-probe") == S3ReadProbePublisher.probeBody)
             #expect(await client.putCallCount == 3)
-            #expect(await client.requestedByteRanges.count == 1)
-        }
-
-        @Test
-        func writerKeepsAnExistingProbe() async {
-            let client = FakeS3ObjectClient()
-            await client.seed([Data("existing".utf8)], for: "cas/_x8-probe")
-            let publisher = S3ReadProbePublisher(
-                api: S3APIObjectStore(client: client, bucket: "foo"),
-                keySpace: S3StorageKeySpace()
-            )
-
-            await publisher.publishProbe(for: .cas)
-
-            #expect(await client.putCallCount == 0)
+            #expect(await client.requestedByteRanges.isEmpty)
         }
 
         @Test

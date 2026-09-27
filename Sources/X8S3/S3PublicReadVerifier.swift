@@ -18,8 +18,7 @@
             let checkedAt: ContinuousClock.Instant
         }
 
-        private let baseURL: URL
-        private let keySpace: S3StorageKeySpace
+        private let probeURLs: [CacheObjectKind: URL]
         private let transport: any S3PublicHTTPTransport
         private let revalidationInterval: Duration
         private let now: @Sendable () -> ContinuousClock.Instant
@@ -34,8 +33,9 @@
             revalidationInterval: Duration = .seconds(60),
             now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
         ) {
-            self.baseURL = baseURL
-            self.keySpace = keySpace
+            probeURLs = Dictionary(uniqueKeysWithValues: CacheObjectKind.allCases.compactMap { kind in
+                URL(string: baseURL.absoluteString + keySpace.probe(for: kind)).map { (kind, $0) }
+            })
             self.transport = transport
             self.revalidationInterval = revalidationInterval
             self.now = now
@@ -50,8 +50,7 @@
                 return await probe.value
             }
 
-            let url = URL(string: baseURL.absoluteString + keySpace.probe(for: kind))
-            let probe = Task { [transport] in await Self.probe(url, transport: transport) }
+            let probe = Task { [transport, url = probeURLs[kind]] in await Self.probe(url, transport: transport) }
             probes[kind] = probe
             let isReadable = await probe.value
             probes[kind] = nil
