@@ -19,6 +19,7 @@ schema for other storage providers.
 
 ## Topics
 
+- <doc:ConfigurationFile>
 - ``X8ConfigurationLoader``
 - ``X8ConfigurationResolver``
 - ``X8Configuration``

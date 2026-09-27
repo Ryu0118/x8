@@ -59,8 +59,26 @@ rules:
   - Sources/X8Config/X8ConfigurationKeyValidator.swift
   - Sources/X8Config/X8ConfigurationURLValidator.swift
   doc: README.md
-  message: .x8.yml configuration schema changed - update the README Setup and Configuration
-    sections if fields, defaults, or validation changed.
+  message: .x8.yml configuration schema changed - update the README Quick Start and
+    Configuration summary if fields, defaults, or validation changed.
+  checksum: 3c1b2cfb4620225db04302c2d6547ed864a5ade8680e47db756ef3936050ae68
+- name: configuration-reference
+  sources:
+  - Sources/X8Config/X8ConfigurationDocument.swift
+  - Sources/X8Config/X8ConfigurationResolver.swift
+  - Sources/X8Config/X8ConfigurationDecoder.swift
+  - Sources/X8Config/X8ConfigurationMerger.swift
+  - Sources/X8Config/X8Configuration.swift
+  - Sources/X8Config/X8S3Document.swift
+  - Sources/X8Config/X8S3APIDocument.swift
+  - Sources/X8Config/X8CredentialsDocument.swift
+  - Sources/X8Config/X8AccessPathDocument.swift
+  - Sources/X8Config/X8S3APIResolver.swift
+  - Sources/X8Config/X8ConfigurationKeyValidator.swift
+  - Sources/X8Config/X8ConfigurationURLValidator.swift
+  doc: Sources/X8Config/X8Config.docc/ConfigurationFile.md
+  message: .x8.yml configuration schema changed - update the configuration reference
+    article if keys, defaults, overlays, or validation changed.
   checksum: 3c1b2cfb4620225db04302c2d6547ed864a5ade8680e47db756ef3936050ae68
 - name: prefix-mapping
   sources:
