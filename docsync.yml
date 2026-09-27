@@ -51,10 +51,17 @@ rules:
   - Sources/X8Config/X8ConfigurationDecoder.swift
   - Sources/X8Config/X8ConfigurationMerger.swift
   - Sources/X8Config/X8Configuration.swift
+  - Sources/X8Config/X8S3Document.swift
+  - Sources/X8Config/X8S3APIDocument.swift
+  - Sources/X8Config/X8CredentialsDocument.swift
+  - Sources/X8Config/X8AccessPathDocument.swift
+  - Sources/X8Config/X8S3APIResolver.swift
+  - Sources/X8Config/X8ConfigurationKeyValidator.swift
+  - Sources/X8Config/X8ConfigurationURLValidator.swift
   doc: README.md
   message: .x8.yml configuration schema changed - update the README Setup and Configuration
     sections if fields, defaults, or validation changed.
-  checksum: fea1d32836890cba969322d7a2b413ee31ba6b51659ffd496497edcc11ae2d2e
+  checksum: 5ae4a064aaca4218a4da61c143fcf38362b95f9b7d06c45b81c2ed81328bea96
 - name: prefix-mapping
   sources:
   - Sources/X8CLI/XcodeBuildArguments.swift

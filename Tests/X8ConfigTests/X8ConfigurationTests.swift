@@ -2,8 +2,21 @@ import Foundation
 import Testing
 @testable import X8Config
 
-@Suite("X8 configuration loading and resolution")
+@Suite("X8 configuration loading keeps raw values and rejects unknown keys")
 struct X8ConfigurationTests {
+    private static let apiConfiguration = """
+    version: 1
+    s3:
+      api:
+        bucket: $BUCKET
+        credentials:
+          source: static
+          accessKeyID: $ACCESS_KEY
+          secretAccessKey: $SECRET_KEY
+      read: api
+      write: api
+    """
+
     @Test
     func loaderRequiresBaseConfiguration() async throws {
         try await ConfigurationTestSupport.withDirectory { root in
@@ -21,10 +34,7 @@ struct X8ConfigurationTests {
         try await ConfigurationTestSupport.withDirectory { parent in
             let nested = parent.appending(path: "Sources", directoryHint: .isDirectory)
             try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
-            try ConfigurationTestSupport.write(
-                "version: 1\nbucket: foo\n",
-                to: parent.appending(path: ".x8.yml")
-            )
+            try ConfigurationTestSupport.write(Self.apiConfiguration, to: parent.appending(path: ".x8.yml"))
 
             await #expect(throws: X8ConfigurationLoadingError.configurationFileNotFound(directory: nested)) {
                 _ = try await X8ConfigurationLoader().load(from: nested)
@@ -33,68 +43,78 @@ struct X8ConfigurationTests {
     }
 
     @Test
-    func loaderMergesLocalOverrideWithoutResolvingValues() async throws {
+    func loaderDecodesNestedValuesWithoutResolvingThem() async throws {
+        try await ConfigurationTestSupport.withDirectory { root in
+            try ConfigurationTestSupport.write(Self.apiConfiguration, to: root.appending(path: ".x8.yml"))
+
+            let document = try await X8ConfigurationLoader().load(from: root)
+
+            #expect(document == X8ConfigurationDocument(
+                version: 1,
+                s3: X8S3Document(
+                    api: X8S3APIDocument(
+                        bucket: "$BUCKET",
+                        credentials: X8CredentialsDocument(
+                            source: "static",
+                            accessKeyID: "$ACCESS_KEY",
+                            secretAccessKey: "$SECRET_KEY"
+                        )
+                    ),
+                    read: .token("api"),
+                    write: .token("api")
+                )
+            ))
+        }
+    }
+
+    @Test
+    func loaderDecodesPublicURLReadPath() async throws {
         try await ConfigurationTestSupport.withDirectory { root in
             try ConfigurationTestSupport.write(
                 """
                 version: 1
-                bucket: $BUCKET
+                s3:
+                  read:
+                    publicURL: https://cache.example.com/team-cache/
+                  write: none
                 """,
                 to: root.appending(path: ".x8.yml")
             )
+
+            let document = try await X8ConfigurationLoader().load(from: root)
+
+            #expect(document.s3?.read == .map(publicURL: "https://cache.example.com/team-cache/"))
+            #expect(document.s3?.write == .token("none"))
+        }
+    }
+
+    @Test
+    func localOverrideReplacesPathsWholeAndMergesAPIFields() async throws {
+        try await ConfigurationTestSupport.withDirectory { root in
+            try ConfigurationTestSupport.write(Self.apiConfiguration, to: root.appending(path: ".x8.yml"))
             try ConfigurationTestSupport.write(
                 """
-                region: ap-northeast-1
-                accessKeyID: $ACCESS_KEY
-                secretAccessKey: $SECRET_KEY
+                s3:
+                  api:
+                    region: ap-northeast-1
+                    credentials:
+                      source: defaultChain
+                  read:
+                    publicURL: https://cache.example.com/
+                  write: none
                 """,
                 to: root.appending(path: ".x8.local.yml")
             )
 
             let document = try await X8ConfigurationLoader().load(from: root)
 
-            #expect(document.version == 1)
-            #expect(document.bucket == "$BUCKET")
-            #expect(document.region == "ap-northeast-1")
-            #expect(document.accessKeyID == "$ACCESS_KEY")
-            #expect(document.secretAccessKey == "$SECRET_KEY")
-        }
-    }
-
-    @Test
-    func loaderMergesLocalOverrideForRole() async throws {
-        try await ConfigurationTestSupport.withDirectory { root in
-            try ConfigurationTestSupport.write(
-                """
-                version: 1
-                bucket: foo
-                role: consumer
-                """,
-                to: root.appending(path: ".x8.yml")
-            )
-            try ConfigurationTestSupport.write(
-                "role: producer",
-                to: root.appending(path: ".x8.local.yml")
-            )
-
-            let document = try await X8ConfigurationLoader().load(from: root)
-
-            #expect(document.role == .producer)
-        }
-    }
-
-    @Test
-    func loaderRejectsInvalidRole() async throws {
-        try await ConfigurationTestSupport.withDirectory { root in
-            let configurationURL = root.appending(path: ".x8.yml")
-            try ConfigurationTestSupport.write(
-                "version: 1\nbucket: foo\nrole: bogus\n",
-                to: configurationURL
-            )
-
-            await #expect(throws: X8ConfigurationLoadingError.invalidYAML(configurationURL)) {
-                _ = try await X8ConfigurationLoader().load(from: root)
-            }
+            #expect(document.s3?.api == X8S3APIDocument(
+                region: "ap-northeast-1",
+                bucket: "$BUCKET",
+                credentials: X8CredentialsDocument(source: "defaultChain")
+            ))
+            #expect(document.s3?.read == .map(publicURL: "https://cache.example.com/"))
+            #expect(document.s3?.write == .token("none"))
         }
     }
 
@@ -103,10 +123,7 @@ struct X8ConfigurationTests {
         let fileManager = RecordingFileManager()
 
         try await ConfigurationTestSupport.withDirectory { root in
-            try ConfigurationTestSupport.write(
-                "version: 1\nbucket: foo\n",
-                to: root.appending(path: ".x8.yml")
-            )
+            try ConfigurationTestSupport.write(Self.apiConfiguration, to: root.appending(path: ".x8.yml"))
 
             _ = try await X8ConfigurationLoader(fileManager: fileManager).load(from: root)
         }
@@ -114,109 +131,21 @@ struct X8ConfigurationTests {
         #expect(fileManager.fileExistsPaths.contains { $0.hasSuffix("/.x8.yml") })
     }
 
-    @Test
-    func loaderRejectsUnknownFields() async throws {
+    @Test(arguments: [
+        ("version: 1\nbucket: foo\n", "bucket"),
+        ("version: 1\ns3:\n  role: consumer\n", "s3.role"),
+        ("version: 1\ns3:\n  api:\n    bucekt: foo\n", "s3.api.bucekt"),
+        ("version: 1\ns3:\n  api:\n    credentials:\n      token: x\n", "s3.api.credentials.token"),
+        ("version: 1\ns3:\n  read:\n    publicUrl: https://a/\n", "s3.read.publicUrl"),
+    ])
+    func loaderRejectsUnknownKeysWithTheirPath(source: String, path: String) async throws {
         try await ConfigurationTestSupport.withDirectory { root in
             let configurationURL = root.appending(path: ".x8.yml")
-            try ConfigurationTestSupport.write(
-                "version: 1\nbucket: foo\nunknown: value\n",
-                to: configurationURL
-            )
+            try ConfigurationTestSupport.write(source, to: configurationURL)
 
-            await #expect(throws: X8ConfigurationLoadingError.unsupportedField(configurationURL, "unknown")) {
+            await #expect(throws: X8ConfigurationLoadingError.unsupportedField(configurationURL, path)) {
                 _ = try await X8ConfigurationLoader().load(from: root)
             }
-        }
-    }
-
-    @Test
-    func resolverExpandsValuesAndAppliesDefaults() throws {
-        let document = X8ConfigurationDocument(
-            version: 1,
-            bucket: "${BUCKET}",
-            accessKeyID: "${ACCESS_KEY}",
-            secretAccessKey: "${SECRET_KEY}",
-            sessionToken: "${SESSION_TOKEN:-}"
-        )
-
-        let configuration = try X8ConfigurationResolver().resolve(
-            document,
-            environment: [
-                "BUCKET": "foo-cache",
-                "ACCESS_KEY": "access",
-                "SECRET_KEY": "secret",
-            ]
-        )
-
-        #expect(configuration.version == 1)
-        #expect(configuration.bucket == "foo-cache")
-        #expect(configuration.region == "us-east-1")
-        #expect(configuration.role == .both)
-        #expect(configuration.credentials == RemoteCacheCredentials(
-            accessKeyID: "access",
-            secretAccessKey: "secret"
-        ))
-    }
-
-    @Test
-    func resolverUsesExplicitRoleWithoutAffectingProfileID() throws {
-        let producer = X8ConfigurationDocument(
-            version: 1,
-            bucket: "foo",
-            role: .producer
-        )
-        let consumer = X8ConfigurationDocument(
-            version: 1,
-            bucket: "foo",
-            role: .consumer
-        )
-
-        let resolvedProducer = try X8ConfigurationResolver().resolve(producer)
-        let resolvedConsumer = try X8ConfigurationResolver().resolve(consumer)
-
-        #expect(resolvedProducer.role == .producer)
-        #expect(resolvedConsumer.role == .consumer)
-        // Role gates writes at the storage boundary; it must not change the
-        // cache-domain identity two differently-scoped invocations share.
-        #expect(resolvedProducer.profileID == resolvedConsumer.profileID)
-    }
-
-    @Test
-    func resolverRejectsIncompleteCredentials() {
-        let document = X8ConfigurationDocument(
-            version: 1,
-            bucket: "foo",
-            accessKeyID: "access"
-        )
-
-        #expect(throws: X8ConfigurationResolutionError.incompleteCredentials) {
-            _ = try X8ConfigurationResolver().resolve(document)
-        }
-    }
-
-    @Test
-    func resolverRejectsNonLocalInsecureEndpoint() {
-        let document = X8ConfigurationDocument(
-            version: 1,
-            endpoint: "http://storage.example",
-            bucket: "foo"
-        )
-
-        #expect(throws: X8ConfigurationResolutionError.invalidField("endpoint")) {
-            _ = try X8ConfigurationResolver().resolve(document)
-        }
-    }
-
-    @Test
-    func resolverRejectsEndpointCredentialsAndQuery() {
-        let document = X8ConfigurationDocument(
-            version: 1,
-            endpoint: "https://user:secret@storage.example/cache?token=secret",
-            bucket: "foo"
-        )
-
-        #expect(throws: X8ConfigurationResolutionError.invalidField("endpoint")) {
-            _ = try X8ConfigurationResolver().resolve(document)
         }
     }
 }

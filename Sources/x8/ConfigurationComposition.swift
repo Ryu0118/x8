@@ -11,8 +11,15 @@ enum X8ConfigurationComposition {
             role: configuration.role,
             displayFields: X8ConfigurationPresentation.fields(configuration),
             credentialSource: X8ConfigurationPresentation.credentialSource(configuration),
-            storageDescription: "bucket=\(configuration.bucket)",
+            storageDescription: storageDescription(configuration),
             socketPath: configuration.socketPath
         )
+    }
+
+    private static func storageDescription(_ configuration: X8Configuration) -> String {
+        if let api = configuration.api {
+            return "bucket=\(api.bucket)"
+        }
+        return "publicURL=\(configuration.read.publicURL?.absoluteString ?? "")"
     }
 }

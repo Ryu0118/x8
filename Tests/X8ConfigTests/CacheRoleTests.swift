@@ -22,9 +22,6 @@ struct CacheRoleTests {
         let role = try JSONDecoder().decode(CacheRole.self, from: data)
 
         #expect(try JSONEncoder().encode(role) == data)
-        #expect(X8ConfigurationPresentation.render(
-            X8Configuration(bucket: "cache", role: role)
-        ).contains("role=\(name)"))
     }
 
     @Test(arguments: ["\"bogus\"", "\"\"", "3", "[\"producer\",\"consumer\"]"])

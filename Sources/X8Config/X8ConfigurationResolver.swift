@@ -3,11 +3,12 @@ import Foundation
 /// Resolves a raw configuration document into a validated runtime-neutral profile.
 ///
 /// This is the in-memory stage after loading. It applies the schema version,
-/// environment expansion, defaults, credential construction, and path and
-/// endpoint validation, then returns `X8Configuration`. It performs no file or
-/// network I/O and never selects or constructs a storage provider. The supplied
-/// environment is copied into an isolated expansion context, so assignment
-/// expressions cannot mutate the caller's process environment.
+/// environment expansion, defaults, and validation of `s3.api`, `s3.read`,
+/// and `s3.write` together, then returns `X8Configuration`. It performs no
+/// file or network I/O and never constructs a storage provider or resolves
+/// credentials. The supplied environment is copied into an isolated
+/// expansion context, so assignment expressions cannot mutate the caller's
+/// process environment.
 package struct X8ConfigurationResolver: Sendable {
     /// Creates a configuration resolver.
     package init() {}
@@ -21,9 +22,9 @@ package struct X8ConfigurationResolver: Sendable {
     ///     expansions. It is used as an isolated value map.
     /// - Returns: A validated configuration that is safe for a frontend to use
     ///   when constructing its selected backend.
-    /// - Throws: `X8ConfigurationResolutionError` for unsupported versions,
-    ///   missing or invalid fields, incomplete credentials, or unsupported
-    ///   scalar expansion syntax.
+    /// - Throws: `X8ConfigurationResolutionError` naming the offending key
+    ///   path for unsupported versions, missing or invalid fields, invalid
+    ///   read/write combinations, or unsupported scalar expansion syntax.
     package func resolve(
         _ document: X8ConfigurationDocument,
         environment: [String: String] = ProcessInfo.processInfo.environment
@@ -34,83 +35,72 @@ package struct X8ConfigurationResolver: Sendable {
         guard version == 1 else {
             throw X8ConfigurationResolutionError.unsupportedVersion(version)
         }
+        guard let s3 = document.s3 else {
+            throw X8ConfigurationResolutionError.missingField("s3")
+        }
 
         var expander = ScalarParameterExpander(environment: environment)
-        let values = try Self.expand(
-            document,
-            version: version,
-            expander: &expander
-        )
-        try Self.validate(values)
+        var api: X8S3APIConfiguration?
+        if let document = s3.api {
+            api = try X8S3APIResolver.resolve(document, expander: &expander)
+        }
+        let read = try Self.resolveRead(s3.read, api: api, expander: &expander)
+        let write = try Self.resolveWrite(s3.write, api: api)
+        let socketPath = try Self.resolveSocketPath(document.socketPath, expander: &expander)
 
-        return X8Configuration(
-            version: values.version,
-            bucket: values.bucket,
-            region: values.region,
-            endpoint: values.endpoint,
-            role: values.role,
-            credentials: values.credentials,
-            socketPath: values.socketPath
-        )
+        guard read != .none || write != .none else {
+            throw X8ConfigurationResolutionError.readAndWriteDisabled
+        }
+        let configuration = X8Configuration(version: version, read: read, write: write, socketPath: socketPath)
+        guard api == nil || configuration.api != nil else {
+            throw X8ConfigurationResolutionError.unusedAPI
+        }
+        return configuration
     }
 
-    private struct ExpandedValues {
-        let version: Int
-        let bucket: String
-        let region: String
-        let endpoint: URL?
-        let role: CacheRole
-        let credentials: RemoteCacheCredentials?
-        let socketPath: String?
-    }
-
-    private static func expand(
-        _ document: X8ConfigurationDocument,
-        version: Int,
+    private static func resolveRead(
+        _ document: X8AccessPathDocument?,
+        api: X8S3APIConfiguration?,
         expander: inout ScalarParameterExpander
-    ) throws -> ExpandedValues {
-        // Resolve the required storage identity before optional provider settings.
-        let bucket = try expandRequiredValue(
-            document.bucket,
-            field: "bucket",
-            expander: &expander
-        )
-        let region = try expander.expand(document.region ?? "us-east-1")
-        let role = document.role ?? .both
-
-        // Endpoint and credentials use the same isolated expansion environment.
-        let endpoint = try resolveEndpoint(document.endpoint, expander: &expander)
-        let credentials = try resolveCredentials(
-            accessKeyID: document.accessKeyID,
-            secretAccessKey: document.secretAccessKey,
-            sessionToken: document.sessionToken,
-            expander: &expander
-        )
-        let socketPath = try document.socketPath.map { try expander.expand($0) }
-
-        return ExpandedValues(
-            version: version,
-            bucket: bucket,
-            region: region,
-            endpoint: endpoint,
-            role: role,
-            credentials: credentials,
-            socketPath: socketPath?.isEmpty == true ? nil : socketPath
-        )
-    }
-
-    private static func validate(_ values: ExpandedValues) throws {
-        // Validate the expanded values, not the raw YAML strings.
-        guard !values.region.isEmpty else {
-            throw X8ConfigurationResolutionError.invalidField("region")
-        }
-        try validatePathComponent(values.bucket, field: "bucket")
-        if let socketPath = values.socketPath {
-            try validateSocketPath(socketPath)
+    ) throws -> X8ReadPath {
+        switch document {
+        case .token("api"):
+            return try .api(require(api, for: "s3.read"))
+        case .token("none"):
+            return .none
+        case let .map(publicURL?):
+            let expanded = try expander.expand(publicURL)
+            return try .publicURL(
+                X8ConfigurationURLValidator.url(expanded, field: "s3.read.publicURL", requiresTrailingSlash: true)
+            )
+        case .map(nil):
+            throw X8ConfigurationResolutionError.missingField("s3.read.publicURL")
+        case .token:
+            throw X8ConfigurationResolutionError.invalidField("s3.read", reason: "expected api, none, or publicURL: <url>")
+        case nil:
+            throw X8ConfigurationResolutionError.missingField("s3.read")
         }
     }
 
-    /// Rejects a socket path unusable as a Unix domain socket endpoint.
+    private static func resolveWrite(
+        _ document: X8AccessPathDocument?,
+        api: X8S3APIConfiguration?
+    ) throws -> X8WritePath {
+        switch document {
+        case .token("api"):
+            try .api(require(api, for: "s3.write"))
+        case .token("none"):
+            .none
+        case .token("publicURL"), .map:
+            throw X8ConfigurationResolutionError.publicURLWrite
+        case .token:
+            throw X8ConfigurationResolutionError.invalidField("s3.write", reason: "expected api or none")
+        case nil:
+            throw X8ConfigurationResolutionError.missingField("s3.write")
+        }
+    }
+
+    /// Expands `socketPath` and rejects a path unusable as a Unix domain socket endpoint.
     ///
     /// The kernel's `sockaddr_un.sun_path` on macOS is 104 bytes including the
     /// terminating NUL, so any path at or beyond 104 UTF-8 bytes cannot be
@@ -118,89 +108,26 @@ package struct X8ConfigurationResolver: Sendable {
     /// the length the kernel actually sees. A relative path would be resolved
     /// against whatever directory a command happens to run from instead of a
     /// fixed team-shared location, defeating the point of pinning it.
-    private static func validateSocketPath(_ socketPath: String) throws {
-        guard socketPath.hasPrefix("/") else {
-            throw X8ConfigurationResolutionError.invalidField("socketPath")
-        }
-        guard socketPath.utf8.count < 104 else {
-            throw X8ConfigurationResolutionError.invalidField("socketPath")
-        }
-    }
-
-    private static func expandRequiredValue(
-        _ value: String?,
-        field: String,
-        expander: inout ScalarParameterExpander
-    ) throws -> String {
-        guard let value else {
-            throw X8ConfigurationResolutionError.missingField(field)
-        }
-        let expanded = try expander.expand(value)
-        guard !expanded.isEmpty else {
-            throw X8ConfigurationResolutionError.invalidField(field)
-        }
-        return expanded
-    }
-
-    private static func resolveEndpoint(
+    private static func resolveSocketPath(
         _ value: String?,
         expander: inout ScalarParameterExpander
-    ) throws -> URL? {
+    ) throws -> String? {
         guard let value else { return nil }
-        let expanded = try expander.expand(value)
-        // Reject credentials and URL modifiers so endpoint text cannot smuggle signing or secret data.
-        guard let endpoint = URL(string: expanded),
-              let scheme = endpoint.scheme?.lowercased(),
-              ["http", "https"].contains(scheme),
-              endpoint.host != nil,
-              endpoint.user == nil,
-              endpoint.password == nil,
-              endpoint.query == nil,
-              endpoint.fragment == nil
-        else {
-            throw X8ConfigurationResolutionError.invalidField("endpoint")
+        let socketPath = try expander.expand(value)
+        guard !socketPath.isEmpty else { return nil }
+        guard socketPath.hasPrefix("/"), socketPath.utf8.count < 104 else {
+            throw X8ConfigurationResolutionError.invalidField(
+                "socketPath",
+                reason: "expected an absolute path shorter than 104 bytes"
+            )
         }
-        // Remote endpoints must use TLS; plain HTTP is limited to loopback development services.
-        guard scheme == "https" || Self.isLocalEndpoint(endpoint) else {
-            throw X8ConfigurationResolutionError.invalidField("endpoint")
-        }
-        return endpoint
+        return socketPath
     }
 
-    private static func isLocalEndpoint(_ endpoint: URL) -> Bool {
-        ["localhost", "127.0.0.1", "::1"].contains(endpoint.host?.lowercased())
-    }
-
-    private static func resolveCredentials(
-        accessKeyID: String?,
-        secretAccessKey: String?,
-        sessionToken: String?,
-        expander: inout ScalarParameterExpander
-    ) throws -> RemoteCacheCredentials? {
-        // Any explicit credential field opts into static credentials; require the key pair instead of mixing providers.
-        guard accessKeyID != nil || secretAccessKey != nil || sessionToken != nil else {
-            return nil
+    private static func require(_ api: X8S3APIConfiguration?, for field: String) throws -> X8S3APIConfiguration {
+        guard let api else {
+            throw X8ConfigurationResolutionError.apiRequired(field)
         }
-        guard let accessKeyID, let secretAccessKey else {
-            throw X8ConfigurationResolutionError.incompleteCredentials
-        }
-        let accessKey = try expander.expand(accessKeyID)
-        let secretKey = try expander.expand(secretAccessKey)
-        guard !accessKey.isEmpty, !secretKey.isEmpty else {
-            throw X8ConfigurationResolutionError.invalidField("credentials")
-        }
-        let token = try sessionToken.map { try expander.expand($0) }
-        return RemoteCacheCredentials(
-            accessKeyID: accessKey,
-            secretAccessKey: secretKey,
-            sessionToken: token?.isEmpty == true ? nil : token
-        )
-    }
-
-    private static func validatePathComponent(_ value: String, field: String) throws {
-        // Path separators and dot components would escape the configured object key.
-        guard !value.contains("/"), !value.contains("\\"), value != ".", value != ".." else {
-            throw X8ConfigurationResolutionError.invalidField(field)
-        }
+        return api
     }
 }

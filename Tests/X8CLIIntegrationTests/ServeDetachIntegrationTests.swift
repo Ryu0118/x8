@@ -161,7 +161,8 @@
             let bucket = "x8-detach-it-" + UUID().uuidString.lowercased()
                 .replacingOccurrences(of: "-", with: "").prefix(12)
             let endpoint = "http://127.0.0.1:1"
-            let profileID = X8Configuration(bucket: String(bucket), endpoint: URL(string: endpoint)).profileID
+            let api = X8S3APIConfiguration(endpoint: URL(string: endpoint), bucket: String(bucket))
+            let profileID = X8Configuration(read: .api(api), write: .api(api)).profileID
 
             runtimeDirectory = Self.applicationSupportX8Root
                 .appending(path: profileID, directoryHint: .isDirectory)
@@ -181,10 +182,16 @@
             try FileManager.default.createDirectory(at: configDirectory, withIntermediateDirectories: true)
             try """
             version: 1
-            bucket: \(bucket)
-            endpoint: \(endpoint)
-            accessKeyID: test
-            secretAccessKey: test
+            s3:
+              api:
+                endpoint: \(endpoint)
+                bucket: \(bucket)
+                credentials:
+                  source: static
+                  accessKeyID: test
+                  secretAccessKey: test
+              read: api
+              write: api
             """.write(to: configDirectory.appending(path: ".x8.yml"), atomically: true, encoding: .utf8)
         }
 

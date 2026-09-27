@@ -4,33 +4,20 @@ import X8Storage
 
 /// The resolved, non-runtime configuration for one remote-cache profile.
 ///
-/// This value contains the official executable's S3-shaped profile and optional
-/// credentials, but no client or filesystem state. The executable uses it to
-/// construct S3 storage. `profileID` identifies the non-secret cache domain and
-/// is safe to use for stable local runtime paths.
+/// The read and write paths are validated together: a path set to `api`
+/// carries the shared `s3.api` settings, so a configuration that references
+/// missing API access cannot be represented. The value holds no client or
+/// filesystem state. `profileID` identifies the non-secret cache domain and is
+/// safe to use for stable local runtime paths.
 package struct X8Configuration: Equatable, Sendable {
     /// The configuration schema version.
     package let version: Int
 
-    /// The object-store bucket containing the cache domain.
-    package let bucket: String
+    /// How this invocation reads the cache.
+    package let read: X8ReadPath
 
-    /// The object-store signing region.
-    package let region: String
-
-    /// The optional S3-compatible endpoint.
-    package let endpoint: URL?
-
-    /// Whether this invocation may push, pull, or both.
-    ///
-    /// This gates storage-boundary reads and writes, not cache identity, so it
-    /// is intentionally excluded from `canonicalProfile`: a producer and a
-    /// consumer invocation of the same repository configuration must resolve
-    /// to the same profile and object-key space.
-    package let role: CacheRole
-
-    /// The optional literal credentials resolved from configuration.
-    package let credentials: RemoteCacheCredentials?
+    /// How this invocation writes the cache.
+    package let write: X8WritePath
 
     /// The optional fixed Unix socket path for the cache proxy.
     ///
@@ -40,23 +27,35 @@ package struct X8Configuration: Equatable, Sendable {
     /// lives, not the cache domain it serves.
     package let socketPath: String?
 
-    /// Creates a remote-cache configuration value without performing validation.
-    package init(
-        version: Int = 1,
-        bucket: String,
-        region: String = "us-east-1",
-        endpoint: URL? = nil,
-        role: CacheRole = .both,
-        credentials: RemoteCacheCredentials? = nil,
-        socketPath: String? = nil
-    ) {
+    /// Creates a configuration value without performing validation.
+    package init(version: Int = 1, read: X8ReadPath, write: X8WritePath, socketPath: String? = nil) {
         self.version = version
-        self.bucket = bucket
-        self.region = region
-        self.endpoint = endpoint
-        self.role = role
-        self.credentials = credentials
+        self.read = read
+        self.write = write
         self.socketPath = socketPath
+    }
+
+    /// The storage-boundary permissions implied by the read and write paths.
+    package var role: CacheRole {
+        var role: CacheRole = []
+        if read != .none {
+            role.insert(.consumer)
+        }
+        if write != .none {
+            role.insert(.producer)
+        }
+        return role
+    }
+
+    /// The signed API access used by either path, if any.
+    package var api: X8S3APIConfiguration? {
+        if case let .api(api) = read {
+            return api
+        }
+        if case let .api(api) = write {
+            return api
+        }
+        return nil
     }
 
     /// A stable identifier for the non-secret profile and cache domain.
@@ -66,15 +65,17 @@ package struct X8Configuration: Equatable, Sendable {
     }
 
     private var canonicalProfile: String {
-        // Length-prefix fields prevent concatenation collisions; the format tag
-        // invalidates local identities if cache-key semantics change. Credentials
-        // are intentionally excluded because the profile ID is non-secret.
-        [
-            String(version),
-            endpoint?.absoluteString ?? "",
-            region,
-            bucket,
-            "x8-cas-v1",
-        ].map { "\($0.utf8.count):\($0)" }.joined()
+        // The cache domain is the bucket when API access exists, otherwise the public URL.
+        // Access paths and credentials are excluded so a reader and a writer of one bucket
+        // share runtime paths. Length-prefixing prevents concatenation collisions; the
+        // format tag invalidates local identities if cache-key semantics change.
+        let domain: [String] = if let api {
+            ["api", api.endpoint?.absoluteString ?? "", api.region, api.bucket]
+        } else {
+            ["public", read.publicURL?.absoluteString ?? ""]
+        }
+        return ([String(version)] + domain + ["x8-cas-v2"])
+            .map { "\($0.utf8.count):\($0)" }
+            .joined()
     }
 }
