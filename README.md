@@ -105,10 +105,13 @@ mise use -g github:Ryu0118/x8
 
 2. Provide credentials. `source: defaultChain` uses your existing AWS setup
    (for example `aws configure` or `aws sso login`). To use explicit keys
-   instead, such as R2 API tokens, put this under `s3.api` and pass the values
-   through environment variables:
+   instead, such as R2 API tokens, set `credentials` to `static` and pass the
+   values through environment variables:
 
    ```yaml
+   s3:
+     api:
+       # bucket, endpoint, ...
        credentials:
          source: static
          accessKeyID: ${AWS_ACCESS_KEY_ID}
