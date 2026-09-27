@@ -1,6 +1,7 @@
 #if X8_S3
     import AsyncHTTPClient
     import SotoS3
+    import X8Config
 
     /// Owns the Soto client stack for signed S3 API access.
     ///
@@ -13,17 +14,20 @@
         private let httpClient: HTTPClient
 
         init(
-            configuration: S3APIConfiguration,
+            configuration: X8S3APIConfiguration,
             maximumConnectionsPerHost: Int,
             maximumConcurrentOperations: Int
         ) {
-            let credentialProvider: CredentialProviderFactory = configuration.credentials.map {
+            let credentialProvider: CredentialProviderFactory = switch configuration.credentials {
+            case let .static(credentials):
                 .static(
-                    accessKeyId: $0.accessKeyID,
-                    secretAccessKey: $0.secretAccessKey,
-                    sessionToken: $0.sessionToken
+                    accessKeyId: credentials.accessKeyID,
+                    secretAccessKey: credentials.secretAccessKey,
+                    sessionToken: credentials.sessionToken
                 )
-            } ?? .default
+            case .defaultChain:
+                .default
+            }
 
             var httpConfiguration = HTTPClient.Configuration()
             httpConfiguration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = maximumConnectionsPerHost

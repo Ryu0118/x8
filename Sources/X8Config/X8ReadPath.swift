@@ -2,8 +2,8 @@ import Foundation
 
 /// How this invocation reads the cache.
 package enum X8ReadPath: Equatable, Sendable {
-    /// Signed GetObject through `s3.api`.
-    case api(X8S3APIConfiguration)
+    /// Signed GetObject through the configuration's `api`.
+    case api
 
     /// Unsigned GET of `publicURL + key`; no credentials are resolved for it.
     case publicURL(URL)

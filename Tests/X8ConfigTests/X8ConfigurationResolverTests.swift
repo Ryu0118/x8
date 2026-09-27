@@ -33,7 +33,8 @@ struct X8ConfigurationResolverTests {
     func resolvesPublicReadWithAPIWrite() throws {
         let configuration = try Self.resolve(api: Self.api, read: Self.publicURL, write: .token("api"))
 
-        #expect(configuration.write == .api(X8S3APIConfiguration(bucket: "foo")))
+        #expect(configuration.write == .api)
+        #expect(configuration.api == X8S3APIConfiguration(bucket: "foo"))
         #expect(configuration.role == .both)
     }
 

@@ -4,14 +4,16 @@ import X8Storage
 
 /// The resolved, non-runtime configuration for one remote-cache profile.
 ///
-/// The read and write paths are validated together: a path set to `api`
-/// carries the shared `s3.api` settings, so a configuration that references
-/// missing API access cannot be represented. The value holds no client or
-/// filesystem state. `profileID` identifies the non-secret cache domain and is
+/// The resolver guarantees that `api` is present exactly when `read` or
+/// `write` is `.api`; both paths then share that one value. The value holds
+/// no client or filesystem state. `profileID` identifies the non-secret cache domain and is
 /// safe to use for stable local runtime paths.
 package struct X8Configuration: Equatable, Sendable {
     /// The configuration schema version.
     package let version: Int
+
+    /// The signed S3 API access shared by any path set to `.api`.
+    package let api: X8S3APIConfiguration?
 
     /// How this invocation reads the cache.
     package let read: X8ReadPath
@@ -28,8 +30,15 @@ package struct X8Configuration: Equatable, Sendable {
     package let socketPath: String?
 
     /// Creates a configuration value without performing validation.
-    package init(version: Int = 1, read: X8ReadPath, write: X8WritePath, socketPath: String? = nil) {
+    package init(
+        version: Int = 1,
+        api: X8S3APIConfiguration? = nil,
+        read: X8ReadPath,
+        write: X8WritePath,
+        socketPath: String? = nil
+    ) {
         self.version = version
+        self.api = api
         self.read = read
         self.write = write
         self.socketPath = socketPath
@@ -45,17 +54,6 @@ package struct X8Configuration: Equatable, Sendable {
             role.insert(.producer)
         }
         return role
-    }
-
-    /// The signed API access used by either path, if any.
-    package var api: X8S3APIConfiguration? {
-        if case let .api(api) = read {
-            return api
-        }
-        if case let .api(api) = write {
-            return api
-        }
-        return nil
     }
 
     /// A stable identifier for the non-secret profile and cache domain.

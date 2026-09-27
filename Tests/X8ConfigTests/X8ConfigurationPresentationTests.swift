@@ -7,7 +7,7 @@ struct X8ConfigurationPresentationTests {
     @Test
     func preservesOrderedFieldsForTheSharedCLI() {
         let api = X8S3APIConfiguration(bucket: "foo-cache")
-        let configuration = X8Configuration(read: .api(api), write: .api(api))
+        let configuration = X8Configuration(api: api, read: .api, write: .api)
         let fields = X8ConfigurationPresentation.fields(configuration)
 
         #expect(fields.map(\.key) == ["version", "read", "write", "endpoint", "region", "bucket", "profile_id", "credentials"])
@@ -27,7 +27,7 @@ struct X8ConfigurationPresentationTests {
                 sessionToken: "session-value"
             ))
         )
-        let configuration = X8Configuration(read: .none, write: .api(api))
+        let configuration = X8Configuration(api: api, read: .none, write: .api)
 
         let output = X8ConfigurationPresentation.render(configuration)
 

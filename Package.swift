@@ -235,6 +235,7 @@ let package = Package(
             name: "X8S3Tests",
             dependencies: [
                 "X8Core",
+                "X8Config",
                 "X8Storage",
                 .target(
                     name: "X8S3",

@@ -5,10 +5,4 @@ package enum X8CredentialSource: Equatable, Sendable {
 
     /// Soto's default provider chain: environment, shared config, SSO, and instance metadata.
     case defaultChain
-
-    /// The static credentials, or `nil` when the default chain resolves them.
-    package var staticCredentials: RemoteCacheCredentials? {
-        guard case let .static(credentials) = self else { return nil }
-        return credentials
-    }
 }

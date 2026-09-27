@@ -61,7 +61,7 @@ rules:
   doc: README.md
   message: .x8.yml configuration schema changed - update the README Setup and Configuration
     sections if fields, defaults, or validation changed.
-  checksum: 5ae4a064aaca4218a4da61c143fcf38362b95f9b7d06c45b81c2ed81328bea96
+  checksum: 3c1b2cfb4620225db04302c2d6547ed864a5ade8680e47db756ef3936050ae68
 - name: prefix-mapping
   sources:
   - Sources/X8CLI/XcodeBuildArguments.swift

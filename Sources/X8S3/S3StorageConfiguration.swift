@@ -13,7 +13,7 @@
     /// validate provider credentials.
     package struct S3StorageConfiguration: Equatable, Sendable {
         /// The signed S3 API access, or `nil` for a public-read-only profile.
-        package let api: S3APIConfiguration?
+        package let api: X8S3APIConfiguration?
 
         /// The public object URL prefix used for unsigned reads, ending in `/`.
         package let publicReadURL: URL?
@@ -46,7 +46,7 @@
         ///
         /// - Precondition: `api` or `publicReadURL` is non-`nil`.
         package init(
-            api: S3APIConfiguration?,
+            api: X8S3APIConfiguration?,
             publicReadURL: URL? = nil,
             maximumConnectionsPerHost: Int = 64,
             maximumConcurrentOperations: Int = 64,
@@ -68,11 +68,11 @@
             credentials: RemoteCacheCredentials? = nil
         ) {
             self.init(
-                api: S3APIConfiguration(
-                    bucket: bucket,
-                    region: region,
+                api: X8S3APIConfiguration(
                     endpoint: endpoint,
-                    credentials: credentials
+                    region: region,
+                    bucket: bucket,
+                    credentials: credentials.map { .static($0) } ?? .defaultChain
                 )
             )
         }

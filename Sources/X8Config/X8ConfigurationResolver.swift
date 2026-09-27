@@ -44,28 +44,30 @@ package struct X8ConfigurationResolver: Sendable {
         if let document = s3.api {
             api = try X8S3APIResolver.resolve(document, expander: &expander)
         }
-        let read = try Self.resolveRead(s3.read, api: api, expander: &expander)
-        let write = try Self.resolveWrite(s3.write, api: api)
+        let read = try Self.resolveRead(s3.read, expander: &expander)
+        let write = try Self.resolveWrite(s3.write)
         let socketPath = try Self.resolveSocketPath(document.socketPath, expander: &expander)
 
         guard read != .none || write != .none else {
             throw X8ConfigurationResolutionError.readAndWriteDisabled
         }
-        let configuration = X8Configuration(version: version, read: read, write: write, socketPath: socketPath)
-        guard api == nil || configuration.api != nil else {
+        let usesAPI = read == .api || write == .api
+        guard api != nil || !usesAPI else {
+            throw X8ConfigurationResolutionError.apiRequired(read == .api ? "s3.read" : "s3.write")
+        }
+        guard api == nil || usesAPI else {
             throw X8ConfigurationResolutionError.unusedAPI
         }
-        return configuration
+        return X8Configuration(version: version, api: api, read: read, write: write, socketPath: socketPath)
     }
 
     private static func resolveRead(
         _ document: X8AccessPathDocument?,
-        api: X8S3APIConfiguration?,
         expander: inout ScalarParameterExpander
     ) throws -> X8ReadPath {
         switch document {
         case .token("api"):
-            return try .api(require(api, for: "s3.read"))
+            return .api
         case .token("none"):
             return .none
         case let .map(publicURL?):
@@ -83,12 +85,11 @@ package struct X8ConfigurationResolver: Sendable {
     }
 
     private static func resolveWrite(
-        _ document: X8AccessPathDocument?,
-        api: X8S3APIConfiguration?
+        _ document: X8AccessPathDocument?
     ) throws -> X8WritePath {
         switch document {
         case .token("api"):
-            try .api(require(api, for: "s3.write"))
+            .api
         case .token("none"):
             .none
         case .token("publicURL"), .map:
@@ -122,12 +123,5 @@ package struct X8ConfigurationResolver: Sendable {
             )
         }
         return socketPath
-    }
-
-    private static func require(_ api: X8S3APIConfiguration?, for field: String) throws -> X8S3APIConfiguration {
-        guard let api else {
-            throw X8ConfigurationResolutionError.apiRequired(field)
-        }
-        return api
     }
 }

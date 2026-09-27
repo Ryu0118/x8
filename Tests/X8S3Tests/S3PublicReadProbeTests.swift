@@ -2,6 +2,7 @@
     import Foundation
     import Synchronization
     import Testing
+    import X8Config
     import X8Core
     @testable import X8S3
     import X8Storage
@@ -84,7 +85,7 @@
         func writerPublishesEachProbeOnce() async throws {
             let client = FakeS3ObjectClient()
             let storage = S3Storage(
-                configuration: .init(api: S3APIConfiguration(bucket: "foo"), publishesReadProbes: true),
+                configuration: .init(api: X8S3APIConfiguration(bucket: "foo"), publishesReadProbes: true),
                 objectClient: client
             )
 
@@ -101,7 +102,7 @@
             let client = FakeS3ObjectClient()
             await client.setDeniesGets(true)
             let storage = S3Storage(
-                configuration: .init(api: S3APIConfiguration(bucket: "foo"), publishesReadProbes: true),
+                configuration: .init(api: X8S3APIConfiguration(bucket: "foo"), publishesReadProbes: true),
                 objectClient: client
             )
 
@@ -131,7 +132,7 @@
         func listingSkipsProbeObjects() async throws {
             let client = FakeS3ObjectClient()
             let storage = S3Storage(
-                configuration: .init(api: S3APIConfiguration(bucket: "foo"), publishesReadProbes: true),
+                configuration: .init(api: X8S3APIConfiguration(bucket: "foo"), publishesReadProbes: true),
                 objectClient: client
             )
             _ = try await storage.save(TestByteStream.make([Data([0x01])]))

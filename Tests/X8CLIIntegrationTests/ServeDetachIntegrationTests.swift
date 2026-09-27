@@ -162,7 +162,7 @@
                 .replacingOccurrences(of: "-", with: "").prefix(12)
             let endpoint = "http://127.0.0.1:1"
             let api = X8S3APIConfiguration(endpoint: URL(string: endpoint), bucket: String(bucket))
-            let profileID = X8Configuration(read: .api(api), write: .api(api)).profileID
+            let profileID = X8Configuration(api: api, read: .api, write: .api).profileID
 
             runtimeDirectory = Self.applicationSupportX8Root
                 .appending(path: profileID, directoryHint: .isDirectory)

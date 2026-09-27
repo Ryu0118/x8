@@ -1,6 +1,7 @@
 #if X8_S3
     import Foundation
     import Testing
+    import X8Config
     import X8Core
     @testable import X8S3
     import X8Storage
@@ -110,7 +111,7 @@
             let transport = FakePublicHTTPTransport()
             let storage = try S3Storage(
                 configuration: .init(
-                    api: S3APIConfiguration(bucket: "foo"),
+                    api: X8S3APIConfiguration(bucket: "foo"),
                     publicReadURL: #require(URL(string: Self.baseURL))
                 ),
                 objectClient: client,
