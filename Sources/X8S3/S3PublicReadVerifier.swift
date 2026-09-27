@@ -4,9 +4,9 @@
 
     /// Decides whether an S3 `AccessDenied` 403 on a public URL means "absent".
     ///
-    /// Without anonymous `s3:ListBucket`, S3 and MinIO answer a GET for a
-    /// missing key with the same 403 `AccessDenied` as a real permission
-    /// failure. Only after an unsigned GET of the namespace's probe object
+    /// Without anonymous `s3:ListBucket`, AWS S3 answers a GET for a missing
+    /// key with the same 403 `AccessDenied` as a real permission failure
+    /// (MinIO answers 404). Only after an unsigned GET of the namespace's probe object
     /// succeeds is anonymous read access proven, so a 403 can safely be
     /// treated as a miss. Verdicts are cached per namespace and re-checked at
     /// most once per `revalidationInterval`, so a revoked policy is noticed

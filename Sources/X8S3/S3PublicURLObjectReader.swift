@@ -70,8 +70,9 @@
             guard await verifier.isReadable(kind) else {
                 throw S3PublicReadError.accessDenied(
                     key: key,
-                    reason: "anonymous read access is unproven; run a writer (write: api) once to publish "
-                        + "the probe object, or allow anonymous ListBucket so misses return 404"
+                    reason: "the namespace's _x8-probe object is not anonymously readable, so this cannot be "
+                        + "told apart from a missing key; grant anonymous s3:GetObject on it, run a writer "
+                        + "(write: api) once to publish it, or allow anonymous ListBucket so misses return 404"
                 )
             }
         }

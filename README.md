@@ -348,9 +348,10 @@ Example public URLs: an R2 bucket's `r2.dev` or custom domain
 `s3:GetObject` only; never grant anonymous writes. x8 does not follow
 redirects on the public URL, so use its final form.
 
-A missing object usually answers `404`, which x8 treats as a cache miss. S3
-and MinIO answer `403 AccessDenied` instead when anonymous `s3:ListBucket` is
-not granted, which looks the same as a real permission error. To tell them
+A missing object usually answers `404`, which x8 treats as a cache miss; MinIO
+and R2 public buckets do so. AWS S3 answers `403 AccessDenied` instead when
+anonymous `s3:ListBucket` is not granted, which looks the same as a real
+permission error. To tell them
 apart, a writer (`write: api`) publishes a small probe object,
 `cas/_x8-probe` and `action-cache/_x8-probe`, after its first write to each
 namespace. After a `403 AccessDenied`, a public reader fetches the probe:
