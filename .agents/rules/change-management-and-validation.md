@@ -9,7 +9,7 @@ design and source documentation belong in the other two rules.
 - Write pull-request titles/bodies, issue comments, and review comments in English.
 - For a pure directory or file move, use `git mv` in a behavior-neutral commit before editing contents.
 - Follow `implementation -> commit -> deploy`; this repository currently has no deployment target, so do not invent one.
-- Never add `Codex-Session:` URLs to commits or pull requests.
+- Never add `Codex-Session:` or `Claude-Session:` URLs, or other agent session links, to commits or pull requests.
 
 ## Validation and safety
 
