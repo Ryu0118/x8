@@ -16,12 +16,14 @@ protocol over a local Unix domain socket and stores the cached objects in AWS
 S3, Cloudflare R2, or any other S3-compatible bucket, so whatever one machine
 compiles, every other machine can download instead of rebuilding.
 
-🚝 **Shared remote cache:** One compilation cache across every Mac and CI
-runner instead of rebuilding the same modules everywhere.
-⚙️ **Drop-in `xcodebuild` proxy:** Wrap `xcodebuild` with `x8 xcodebuild`, or
-run a standalone proxy with `x8 serve` for Xcode.app GUI builds.
-🔌 **Any S3-compatible provider:** AWS S3, Cloudflare R2, MinIO, or your own —
-no backend lock-in.
+## Features
+
+- 🚝 **Shared remote cache** — Share one compilation cache across your team's
+  Macs and CI runners instead of rebuilding the same modules everywhere.
+- ⚙️ **Drop-in `xcodebuild` proxy** — Wrap `xcodebuild` with `x8 xcodebuild`, or
+  run a standalone proxy with `x8 serve` for Xcode.app GUI builds.
+- 🔌 **Any S3-compatible provider** — AWS S3, Cloudflare R2, MinIO, or your own;
+  no backend lock-in.
 
 ## Table of Contents
 
