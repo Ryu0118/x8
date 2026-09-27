@@ -104,8 +104,9 @@ mise use -g github:Ryu0118/x8
    ```
 
 2. Provide credentials. `source: defaultChain` uses the standard AWS credential
-   provider chain (environment, shared config file, SSO, `AssumeRole`, and
-   container or instance metadata). `source: static` takes explicit keys; for
+   provider chain: environment variables, the `~/.aws` credentials and config
+   files (including `AWS_PROFILE` and `role_arn`), `aws sso login`, then
+   `aws login`. `source: static` takes explicit keys; for
    R2, create S3 API credentials for your bucket. Every value in `.x8.yml`
    supports POSIX-style `$VAR`/`${VAR}` expansion against the process
    environment, so keys can be committed by reference:

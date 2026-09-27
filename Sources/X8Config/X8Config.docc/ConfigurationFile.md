@@ -45,7 +45,7 @@ socketPath: ${HOME}/.x8/cache.sock   # optional
 | `s3.api.bucket` | yes | The S3 bucket name. |
 | `s3.api.region` | no | AWS region or provider-specific signing region. Defaults to `us-east-1`. |
 | `s3.api.endpoint` | no | Custom endpoint for an S3-compatible provider such as R2 or MinIO. Omit for AWS S3. |
-| `s3.api.credentials.source` | yes | `defaultChain` uses the standard AWS credential provider chain (environment, shared config file, SSO, `AssumeRole`, and container or instance metadata); `static` uses the keys below. |
+| `s3.api.credentials.source` | yes | `defaultChain` uses the machine's existing AWS setup, tried in order: `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` environment variables, the `~/.aws` credentials and config files (profile from `AWS_PROFILE`, including `role_arn` AssumeRole), `aws sso login`, then `aws login`. `static` uses the keys below. |
 | `s3.api.credentials.accessKeyID` / `secretAccessKey` | with `static` | Static key pair. Never commit a literal value; use `$VAR` expansion. |
 | `s3.api.credentials.sessionToken` | no | Optional session token for temporary/STS credentials, with `static`. |
 | `socketPath` | no | Fixed Unix socket path for the cache proxy, shared by `serve`, `serve stop`, `tail`, and `stats`. Must be an absolute path under 104 UTF-8 bytes. Omit to use the per-user default derived from the profile. |
