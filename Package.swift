@@ -143,6 +143,11 @@ let package = Package(
                     condition: .when(traits: ["S3"])
                 ),
                 .product(
+                    name: "NIOCore",
+                    package: "swift-nio",
+                    condition: .when(traits: ["S3"])
+                ),
+                .product(
                     name: "AsyncOperations",
                     package: "swift-async-operations"
                 ),

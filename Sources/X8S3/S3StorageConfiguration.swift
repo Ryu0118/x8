@@ -5,21 +5,18 @@
 
     /// Configuration for one S3-compatible X8 cache domain.
     ///
-    /// The bucket identifies the object-key boundary used by the backend.
-    /// This value only holds configuration and does not create an AWS
-    /// client, access the network, or validate provider credentials.
+    /// Signed S3 API access and an unsigned public read URL are independent:
+    /// at least one must be present. Xcode-path reads use the public URL when
+    /// it is set and the signed API otherwise; writes, administration, and
+    /// retention always require the signed API. This value only holds
+    /// configuration and does not create a client, access the network, or
+    /// validate provider credentials.
     package struct S3StorageConfiguration: Equatable, Sendable {
-        /// The bucket containing X8 records.
-        package let bucket: String
+        /// The signed S3 API access, or `nil` for a public-read-only profile.
+        package let api: S3APIConfiguration?
 
-        /// The AWS region or provider-specific signing region.
-        package let region: String
-
-        /// The optional endpoint for an S3-compatible service.
-        package let endpoint: URL?
-
-        /// The optional static credentials for this profile.
-        package let credentials: RemoteCacheCredentials?
+        /// The public object URL prefix used for unsigned reads, ending in `/`.
+        package let publicReadURL: URL?
 
         /// The soft limit on concurrent HTTP/1.1 connections per host.
         ///
@@ -30,29 +27,45 @@
         /// `deadlineExceeded` rather than a provider error.
         package let maximumConnectionsPerHost: Int
 
-        /// The maximum number of concurrent S3 operations (get and put)
-        /// this storage instance issues at once.
+        /// The maximum number of concurrent operations (get and put) this
+        /// storage instance issues at once on each client.
         ///
         /// Keep this at or below `maximumConnectionsPerHost`: a wider
         /// semaphore than the connection pool just queues behind the pool
         /// again, reproducing the same starvation.
         package let maximumConcurrentOperations: Int
 
-        /// Creates an S3 backend configuration.
+        /// Creates a backend configuration from signed API access and/or a public read URL.
+        ///
+        /// - Precondition: `api` or `publicReadURL` is non-`nil`.
+        package init(
+            api: S3APIConfiguration?,
+            publicReadURL: URL? = nil,
+            maximumConnectionsPerHost: Int = 64,
+            maximumConcurrentOperations: Int = 64
+        ) {
+            precondition(api != nil || publicReadURL != nil, "S3 storage needs signed API access or a public read URL")
+            self.api = api
+            self.publicReadURL = publicReadURL
+            self.maximumConnectionsPerHost = maximumConnectionsPerHost
+            self.maximumConcurrentOperations = maximumConcurrentOperations
+        }
+
+        /// Creates a signed-API-only configuration.
         package init(
             bucket: String,
             region: String = "us-east-1",
             endpoint: URL? = nil,
-            credentials: RemoteCacheCredentials? = nil,
-            maximumConnectionsPerHost: Int = 64,
-            maximumConcurrentOperations: Int = 64
+            credentials: RemoteCacheCredentials? = nil
         ) {
-            self.bucket = bucket
-            self.region = region
-            self.endpoint = endpoint
-            self.credentials = credentials
-            self.maximumConnectionsPerHost = maximumConnectionsPerHost
-            self.maximumConcurrentOperations = maximumConcurrentOperations
+            self.init(
+                api: S3APIConfiguration(
+                    bucket: bucket,
+                    region: region,
+                    endpoint: endpoint,
+                    credentials: credentials
+                )
+            )
         }
     }
 #endif

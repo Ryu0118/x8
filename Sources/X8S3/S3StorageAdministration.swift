@@ -7,7 +7,7 @@
     extension S3Storage: CacheAdministration, CASReferenceReader {
         /// Lists one X8 cache namespace as revision-bearing observations.
         public func listObjects(of kind: CacheObjectKind) async throws -> [CacheObject] {
-            let metadata = try await api.list(prefix: keySpace.prefix(for: kind))
+            let metadata = try await requiredAPI(for: "Cache administration").list(prefix: keySpace.prefix(for: kind))
             // Provider listings can contain unrelated keys; only exact, parseable X8 keys become purge candidates.
             return metadata.compactMap { object in
                 guard let identifier = keySpace.identifier(
@@ -37,7 +37,7 @@
             guard keySpace.matches(object) else {
                 return .revisionChanged
             }
-            let result = try await api.delete(
+            let result = try await requiredAPI(for: "Cache administration").delete(
                 key: object.key,
                 revision: String(decoding: revision.rawValue, as: UTF8.self)
             )
@@ -62,7 +62,7 @@
             let batchResults = try await chunks.asyncMap(
                 numberOfConcurrentTasks: UInt(max(1, chunks.count))
             ) { chunk in
-                try await self.api.deleteObjects(chunk)
+                try await self.requiredAPI(for: "Cache administration").deleteObjects(chunk)
             }
 
             let deletedCount = batchResults.reduce(0) { $0 + $1.deletedKeys.count }
@@ -90,7 +90,7 @@
         /// surface as a remote error, since the object genuinely exists.
         public func references(of id: CASDataID) async throws -> [CASDataID]? {
             let range = Int64.zero ... (S3StorageCodec.recommendedHeaderReadBytes - 1)
-            guard let stream = try await api.get(
+            guard let stream = try await requiredAPI(for: "Cache administration").get(
                 key: keySpace.cas(id: id.rawValue),
                 byteRange: range
             ) else { return nil }
