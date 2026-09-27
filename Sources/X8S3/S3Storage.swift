@@ -25,10 +25,12 @@
         /// The resolved provider configuration shared by data and administration paths.
         package let configuration: S3StorageConfiguration
 
-        /// The provider-neutral object client used by this storage actor.
-        package let objectClient: any S3ObjectClient
+        /// The signed API store used for writes, administration, and retention.
+        package let api: S3APIObjectStore
         /// The immutable category key space shared by all storage conformances.
         package let keySpace: S3StorageKeySpace
+        /// The reader used for Xcode-path CAS and Action Cache reads.
+        private let reader: any S3ObjectReader
         private let fileManager: any FileManagerProtocol
         private var awsClient: AWSClient?
         private var ownedHTTPClient: HTTPClient?
@@ -75,10 +77,14 @@
                 options: [.s3DisableChunkedUploads]
             )
             self.configuration = configuration
-            objectClient = ThrottledS3ObjectClient(
-                wrapping: SotoS3ObjectClient(service: service),
-                maximumConcurrentOperations: configuration.maximumConcurrentOperations
+            api = S3APIObjectStore(
+                client: ThrottledS3ObjectClient(
+                    wrapping: SotoS3ObjectClient(service: service),
+                    maximumConcurrentOperations: configuration.maximumConcurrentOperations
+                ),
+                bucket: configuration.bucket
             )
+            reader = api
             keySpace = S3StorageKeySpace()
             self.fileManager = fileManager
             awsClient = client
@@ -96,7 +102,8 @@
             fileManager: any FileManagerProtocol = FileManager.default
         ) {
             self.configuration = configuration
-            self.objectClient = objectClient
+            api = S3APIObjectStore(client: objectClient, bucket: configuration.bucket)
+            reader = api
             keySpace = S3StorageKeySpace()
             self.fileManager = fileManager
             awsClient = nil
@@ -145,9 +152,9 @@
 
         /// Returns the action-cache value for a key, or `nil` when absent.
         package func getValue(for key: ActionCacheKey) async throws -> ActionCacheValue? {
-            guard let stream = try await objectClient.get(
-                bucket: configuration.bucket,
-                key: keySpace.actionCache(key: key.rawValue)
+            guard let stream = try await reader.get(
+                key: keySpace.actionCache(key: key.rawValue),
+                kind: .actionCache
             ) else { return nil }
             let data = try await ByteStreamSupport.collect(
                 stream,
@@ -159,10 +166,9 @@
         /// Replaces the action-cache value for a key.
         package func putValue(_ value: ActionCacheValue, for key: ActionCacheKey) async throws {
             let dedupeKey = ActionCacheDedupeKey(key: key, value: value)
-            try await actionCacheDeduplicator.withDeduplication(key: dedupeKey) { [objectClient, configuration, keySpace] in
+            try await actionCacheDeduplicator.withDeduplication(key: dedupeKey) { [api, keySpace] in
                 let data = S3StorageCodec.encodeActionCache(value)
-                try await objectClient.put(
-                    bucket: configuration.bucket,
+                try await api.put(
                     key: keySpace.actionCache(key: key.rawValue),
                     body: ByteStreamSupport.make(data),
                     contentLength: Int64(data.count)
@@ -180,9 +186,9 @@
         package func getCASRecord(
             id: CASDataID
         ) async throws -> (references: [CASDataID], bytes: ByteStream)? {
-            guard let stream = try await objectClient.get(
-                bucket: configuration.bucket,
-                key: keySpace.cas(id: id.rawValue)
+            guard let stream = try await reader.get(
+                key: keySpace.cas(id: id.rawValue),
+                kind: .cas
             ) else { return nil }
             return try await S3StorageCodec.decodeCASHeader(from: stream)
         }
@@ -202,14 +208,13 @@
             )
             let header = S3StorageCodec.encodeCASHeader(references: references)
 
-            try await casDeduplicator.withDeduplication(key: id) { [objectClient, configuration, keySpace] in
+            try await casDeduplicator.withDeduplication(key: id) { [api, keySpace] in
                 let payload = try staged.stream()
                 let body = ByteStreamSupport.prepend(
                     header,
                     to: payload
                 )
-                try await objectClient.put(
-                    bucket: configuration.bucket,
+                try await api.put(
                     key: keySpace.cas(id: id.rawValue),
                     body: body,
                     contentLength: Int64(header.count) + staged.byteCount
