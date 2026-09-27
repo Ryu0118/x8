@@ -35,6 +35,13 @@
         /// again, reproducing the same starvation.
         package let maximumConcurrentOperations: Int
 
+        /// Whether writes also publish the probe objects public readers verify.
+        ///
+        /// Enable this for a profile that writes the cache, so a
+        /// public-URL reader of the same bucket can distinguish an
+        /// `AccessDenied` miss from a permission failure.
+        package let publishesReadProbes: Bool
+
         /// Creates a backend configuration from signed API access and/or a public read URL.
         ///
         /// - Precondition: `api` or `publicReadURL` is non-`nil`.
@@ -42,13 +49,15 @@
             api: S3APIConfiguration?,
             publicReadURL: URL? = nil,
             maximumConnectionsPerHost: Int = 64,
-            maximumConcurrentOperations: Int = 64
+            maximumConcurrentOperations: Int = 64,
+            publishesReadProbes: Bool = false
         ) {
             precondition(api != nil || publicReadURL != nil, "S3 storage needs signed API access or a public read URL")
             self.api = api
             self.publicReadURL = publicReadURL
             self.maximumConnectionsPerHost = maximumConnectionsPerHost
             self.maximumConcurrentOperations = maximumConcurrentOperations
+            self.publishesReadProbes = publishesReadProbes
         }
 
         /// Creates a signed-API-only configuration.

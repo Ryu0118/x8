@@ -13,6 +13,8 @@
         private let actionCacheBase = "action-cache/"
         private let casBase = "cas/"
         private let retentionBase = "retention/"
+        /// Odd length and non-hex, so `identifier(from:for:)` never parses it as a cache record.
+        private let probeName = "_x8-probe"
 
         /// Creates the keyspace for one S3 bucket.
         package init() {}
@@ -83,6 +85,11 @@
                 cas(id: object.identifier)
             }
             return object.key == expectedKey
+        }
+
+        /// Builds the public-read probe key for one cache namespace.
+        package func probe(for kind: CacheObjectKind) -> String {
+            prefix(for: kind) + probeName
         }
 
         /// Builds the key for one X8-owned retention anchor.

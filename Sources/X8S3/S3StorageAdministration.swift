@@ -120,7 +120,10 @@
 
         /// Falls back to a full read when the ranged header prefix may be truncated.
         private func referencesFromFullRecord(id: CASDataID) async throws -> [CASDataID]? {
-            guard let record = try await getCASRecord(id: id) else { return nil }
+            guard let record = try await getCASRecord(
+                id: id,
+                via: requiredAPI(for: "Cache administration")
+            ) else { return nil }
             try await ByteStreamSupport.discard(record.bytes)
             return record.references
         }

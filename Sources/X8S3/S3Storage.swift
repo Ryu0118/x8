@@ -30,6 +30,7 @@
         /// The reader used for Xcode-path CAS and Action Cache reads.
         private let reader: any S3ObjectReader
         private let fileManager: any FileManagerProtocol
+        private let probePublisher: S3ReadProbePublisher?
         private var liveAPIClient: S3LiveAPIClient?
         private var livePublicTransport: AsyncHTTPPublicTransport?
         private let casDeduplicator = S3UploadDeduplicator<CASDataID>()
@@ -114,9 +115,18 @@
             livePublicTransport: AsyncHTTPPublicTransport?
         ) {
             self.configuration = configuration
+            let keySpace = S3StorageKeySpace()
             self.api = api
-            reader = Self.makeReader(configuration: configuration, api: api, publicTransport: publicTransport)
-            keySpace = S3StorageKeySpace()
+            self.keySpace = keySpace
+            reader = Self.makeReader(
+                configuration: configuration,
+                api: api,
+                publicTransport: publicTransport,
+                keySpace: keySpace
+            )
+            probePublisher = configuration.publishesReadProbes
+                ? api.map { S3ReadProbePublisher(api: $0, keySpace: keySpace) }
+                : nil
             self.fileManager = fileManager
             self.liveAPIClient = liveAPIClient
             self.livePublicTransport = livePublicTransport
@@ -193,6 +203,7 @@
                     contentLength: Int64(data.count)
                 )
             }
+            await probePublisher?.publishProbe(for: .actionCache)
         }
 
         deinit {
@@ -201,10 +212,14 @@
         }
 
         /// Reads the provider envelope and returns references plus a lazy payload stream.
+        ///
+        /// Xcode-path reads use the configured reader; administration passes
+        /// the signed API store so purge never depends on public access.
         package func getCASRecord(
-            id: CASDataID
+            id: CASDataID,
+            via reader: (any S3ObjectReader)? = nil
         ) async throws -> (references: [CASDataID], bytes: ByteStream)? {
-            guard let stream = try await reader.get(
+            guard let stream = try await (reader ?? self.reader).get(
                 key: keySpace.cas(id: id.rawValue),
                 kind: .cas
             ) else { return nil }
@@ -239,6 +254,7 @@
                     contentLength: Int64(header.count) + staged.byteCount
                 )
             }
+            await probePublisher?.publishProbe(for: .cas)
             return id
         }
     }
@@ -247,22 +263,22 @@
         static func makeReader(
             configuration: S3StorageConfiguration,
             api: S3APIObjectStore?,
-            publicTransport: (any S3PublicHTTPTransport)?
+            publicTransport: (any S3PublicHTTPTransport)?,
+            keySpace: S3StorageKeySpace
         ) -> any S3ObjectReader {
-            if let baseURL = configuration.publicReadURL {
-                guard let publicTransport else {
-                    preconditionFailure("A public read URL needs a public transport")
-                }
-                return S3PublicURLObjectReader(
+            switch (configuration.publicReadURL, publicTransport, api) {
+            case let (baseURL?, transport?, _):
+                S3PublicURLObjectReader(
                     baseURL: baseURL,
-                    transport: publicTransport,
+                    transport: transport,
+                    verifier: S3PublicReadVerifier(baseURL: baseURL, keySpace: keySpace, transport: transport),
                     maximumConcurrentOperations: configuration.maximumConcurrentOperations
                 )
+            case let (nil, _, api?):
+                api
+            default:
+                preconditionFailure("S3 storage needs signed API access or a public URL with its transport")
             }
-            guard let api else {
-                preconditionFailure("S3 storage without a public read URL needs signed API access")
-            }
-            return api
         }
     }
 #endif
