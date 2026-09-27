@@ -32,6 +32,7 @@ compiles, every other machine can download instead of rebuilding.
   - [`xcodebuild`](#1-xcodebuild)
   - [Xcode.app GUI builds](#2-xcodeapp-gui-builds)
 - [Configuration](#configuration)
+  - [Reading without credentials](#reading-without-credentials)
 - [Commands](#commands)
 - [Using another storage implementation](#using-another-storage-implementation)
 - [Documentation](#documentation)
