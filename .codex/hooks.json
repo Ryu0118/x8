@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'.codex/hooks/pre-commit-lint.sh'"
+            "command": ".codex/hooks/pre-commit-lint.sh"
           }
         ]
       }
@@ -21,7 +21,7 @@
           },
           {
             "type": "command",
-            "command": "'.codex/hooks/post-edit-lint.sh'"
+            "command": ".codex/hooks/post-edit-lint.sh"
           }
         ]
       },
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat | sh '.codex/hooks/gitnagg-check.sh'"
+            "command": "cat | sh .codex/hooks/gitnagg-check.sh"
           }
         ]
       }
