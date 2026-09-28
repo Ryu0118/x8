@@ -88,7 +88,30 @@ def embed(site: Path, manifest_path: Path) -> None:
 
         page = json.loads(page_path.read_text())
         by_title = {diagram["title"]: diagram for diagram in page_diagrams}
-        used_titles: set[str] = set()
+        expected = set(by_title)
+        existing_images: set[str] = set()
+
+        def collect_images(value: Any) -> None:
+            if isinstance(value, list):
+                for child in value:
+                    collect_images(child)
+            elif isinstance(value, dict):
+                if value.get("type") == "image":
+                    existing_images.add(str(value.get("identifier", "")))
+                for child in value.values():
+                    collect_images(child)
+
+        for section in page.get("primaryContentSections", []):
+            collect_images(section)
+        for section in page.get("sections", []):
+            collect_images(section)
+
+        embedded_titles = {
+            diagram["title"]
+            for diagram in page_diagrams
+            if f"{diagram['name']}.svg" in existing_images
+        }
+        transformed_titles: set[str] = set()
 
         def replace(value: Any) -> Any:
             if isinstance(value, list):
@@ -100,7 +123,9 @@ def embed(site: Path, manifest_path: Path) -> None:
                 diagram = by_title.get(title or "")
                 if diagram is None:
                     raise SystemExit(f"No Mermaid source matches DocC diagram title {title!r} in {page_path}")
-                used_titles.add(diagram["title"])
+                if diagram["title"] in embedded_titles or diagram["title"] in transformed_titles:
+                    raise SystemExit(f"Duplicate Mermaid diagram in DocC render node: {title!r}")
+                transformed_titles.add(diagram["title"])
                 filename = f"{diagram['name']}.svg"
                 dark_filename = f"{diagram['name']}~dark.svg"
                 image_directory = site / "images" / module
@@ -133,12 +158,14 @@ def embed(site: Path, manifest_path: Path) -> None:
             return {key: replace(child) for key, child in value.items()}
 
         page = replace(page)
-        expected = set(by_title)
-        if used_titles != expected:
-            missing = ", ".join(sorted(expected - used_titles))
+        if embedded_titles | transformed_titles != expected:
+            missing = ", ".join(sorted(expected - embedded_titles - transformed_titles))
             raise SystemExit(f"DocC Mermaid listings missing from {page_path}: {missing}")
+        if not transformed_titles:
+            print(f"Already embedded {len(embedded_titles)} diagrams in {page_path.relative_to(site)}.")
+            continue
         page_path.write_text(json.dumps(page, indent=2, ensure_ascii=False) + "\n")
-        print(f"Embedded {len(used_titles)} diagrams in {page_path.relative_to(site)}.")
+        print(f"Embedded {len(transformed_titles)} diagrams in {page_path.relative_to(site)}.")
 
 
 def main() -> None:
