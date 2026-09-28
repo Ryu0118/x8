@@ -73,7 +73,7 @@ private struct ConsumerFixture: Sendable {
 
         let traitSyntax = traits.map { "\"\($0)\"" }.joined(separator: ", ")
         let manifest = """
-        // swift-tools-version: 6.1
+        // swift-tools-version: 6.4
 
         import PackageDescription
 

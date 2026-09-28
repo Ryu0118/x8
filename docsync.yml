@@ -7,7 +7,7 @@ rules:
   doc: Sources/X8CLI/X8CLI.docc/CreatingACustomCLI.md
   message: Shared CLI entry points changed - verify the custom executable guide and
     example.
-  checksum: c7afd2537323671e2c62690622970f56b8bab1ecc774e19462f616d0ef8732e2
+  checksum: 357a9eb96749ce9ed065bb13334b55f44d01955dd826ffffa7f1a267d3051ba5
 - name: custom-cli-configuration
   sources:
   - Sources/X8CLI/X8CLIConfiguration.swift

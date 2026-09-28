@@ -151,6 +151,6 @@ Xcode 26 crashes on cached, prefix-mapped batch diagnostics because the
 compiler registered source buffers under the mapped path, where diagnostic
 consumers could not find them. The Swift 6.4 fix
 ([swiftlang/swift#90700](https://github.com/swiftlang/swift/pull/90700))
-registers them under the original path and ships in Xcode 27. The Swift 6.1
+registers them under the original path and ships in Xcode 27. The Swift 6.4
 tools version in `Package.swift` describes building X8 itself, not the
 supported Xcode client.
