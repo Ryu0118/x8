@@ -10,6 +10,7 @@ on:
       - 'Package.resolved'
       - '.github/workflows/docs.yml'
       - 'scripts/render-diagrams.sh'
+      - 'scripts/mermaid-docs.py'
   workflow_dispatch:
 
 env:
@@ -28,8 +29,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Render Mermaid diagrams
-        run: ./scripts/render-diagrams.sh
+      - name: Set up Swift 6.4
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.4.0'
 
       - name: Build documentation
         run: |
@@ -53,6 +56,9 @@ jobs:
             --output-path .build/docs
         env:
           REPOSITORY_NAME: ${{ github.event.repository.name }}
+
+      - name: Render and embed Mermaid diagrams
+        run: ./scripts/render-diagrams.sh .build/docs
 
       - name: Redirect site root to documentation
         run: |
