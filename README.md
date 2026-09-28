@@ -165,13 +165,6 @@ Pass `--no-prefix-mapping` (before the child `xcodebuild` argument) if your
 project already handles build-path portability itself. See
 [Prefix mapping](Sources/X8Kit/X8Kit.docc/PrefixMapping.md) for details.
 
-While a build is running, `x8 tail` (run from another terminal in the same
-project) streams that invocation's cache traffic, the same as it would for
-`x8 serve`. `x8 serve` also prints its own live cache traffic inline while it
-runs, so a standalone proxy needs no separate `x8 tail` to watch it. See
-[Watching live cache traffic](#watching-live-cache-traffic) for how the two
-relate when both are running at once.
-
 ### 2. Xcode.app GUI builds
 
 Xcode's GUI builds can't be wrapped, so they need the settings Xcode's
