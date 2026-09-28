@@ -22,7 +22,26 @@ Both runtime modes use the same server lifecycle:
 5. The caller retains the session or handle, uses the socket, and eventually
    requests graceful shutdown or waits for the server to stop naturally.
 
-![Startup moves from preparing the directory through serving and waiting for the socket to appear, then protecting it with restrictive permissions before reaching ready; any failure in that path moves to startup-failed and drains. From ready, shutdown or a transport failure moves to draining and then terminates.](server-lifecycle-states.svg)
+```mermaid
+stateDiagram-v2
+accTitle: Server Lifecycle States
+accDescr: Startup moves from preparing the directory through serving and waiting for the socket to appear, then protecting it with restrictive permissions before reaching ready; any failure in that path moves to startup-failed and drains. From ready, shutdown or a transport failure moves to draining and then terminates.
+    [*] --> PreparingDirectory: runner selects socket path
+    PreparingDirectory --> Serving: server factory starts serve() task
+    Serving --> WaitingForSocket
+    WaitingForSocket --> WaitingForSocket: poll for the socket path
+    WaitingForSocket --> ProtectingSocket: socket path exists
+    WaitingForSocket --> StartupFailed: task exited early
+    WaitingForSocket --> StartupFailed: startup deadline elapsed
+    WaitingForSocket --> StartupFailed: cancelled or filesystem error
+    ProtectingSocket --> Ready: restrictive permissions applied, task ownership to session
+    ProtectingSocket --> StartupFailed: permission change fails
+    StartupFailed --> Drained: graceful stop requested; serving task awaited
+    Drained --> [*]: socket removed; original error rethrown
+    Ready --> Draining: shutdown() or termination signal
+    Ready --> Draining: transport failure (wait() rethrows after cleanup)
+    Draining --> [*]: response files removed; socket removed
+```
 
 If startup fails, the coordinator requests a graceful stop, awaits the serving
 task, removes the socket, and rethrows the original error. After readiness,
@@ -50,7 +69,31 @@ identifiers; changing the socket path does not rename cache records.
 
 ## Protocol and storage boundary
 
-![Xcode requests flow over the Unix-domain socket into the protocol adapter, where KeyValueDB messages map to the ActionCacheStore and CASDBService messages map to the CASStore, both backed by the configured storage backend.](xcode-cache-boundary.svg)
+```mermaid
+flowchart LR
+accTitle: Xcode Cache Boundary
+accDescr: Xcode requests flow over the Unix-domain socket into the protocol adapter, where KeyValueDB messages map to the ActionCacheStore and CASDBService messages map to the CASStore, both backed by the configured storage backend.
+    Xcode["Xcode / xcodebuild"]
+    Socket["Unix-domain socket\ngRPC endpoint"]
+
+    subgraph Adapter["Protocol adapter"]
+        AC["Action Cache\nKeyValueDB"]
+        CAS["CAS\nCASDBService"]
+    end
+
+    subgraph Storage["Storage boundary"]
+        ACStore["ActionCacheStore"]
+        CASStore["CASStore"]
+    end
+
+    Xcode --> Socket
+    Socket --> AC
+    Socket --> CAS
+    AC --> ACStore
+    CAS --> CASStore
+    ACStore --> Backend["Storage backend\n(e.g. X8S3)"]
+    CASStore --> Backend
+```
 
 The protocol adapter translates `CASDBService` and `KeyValueDB` messages into
 `X8Storage.CASStore` and `X8Storage.ActionCacheStore` operations. A missing record is a cache

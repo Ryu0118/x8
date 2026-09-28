@@ -49,7 +49,30 @@ concepts:
   CASObject to an output CASObject with their CASIDs". The key identifies a
   compilation action; the value points at its cached outputs.
 
-![Action Cache maps an opaque key to small value entries; CAS maps an opaque CASDataID to a CASObject (blob plus references) or CASBlob (blob only), and Action Cache value entries carry CAS IDs into the CAS side.](cache-record-shapes.svg)
+```mermaid
+flowchart LR
+accTitle: Cache Record Shapes
+accDescr: Action Cache maps an opaque key to small value entries; CAS maps an opaque CASDataID to a CASObject (blob plus references) or CASBlob (blob only), and Action Cache value entries carry CAS IDs into the CAS side.
+    subgraph AC["Action Cache — KeyValueDB"]
+        direction TB
+        ACK["key: bytes<br/>(opaque action digest)"]
+        ACV["Value entries: map string to bytes<br/>small result record"]
+        ACK -- "GetValue / PutValue" --> ACV
+        ACO["GetValue outcome:<br/>SUCCESS / KEY_NOT_FOUND / ERROR"]
+    end
+
+    subgraph CAS["CAS — CASDBService"]
+        direction TB
+        ID["CASDataID id: bytes<br/>(opaque)"]
+        OBJ["CASObject<br/>blob + repeated references"]
+        BLOB["CASBlob<br/>blob only, no references"]
+        ID -- "Get / Put" --> OBJ
+        ID -- "Load / Save" --> BLOB
+        CO["Get/Load outcome:<br/>SUCCESS / OBJECT_NOT_FOUND / ERROR"]
+    end
+
+    ACV -. "entries carry CAS IDs" .-> ID
+```
 
 The two services are deliberately different shapes:
 
@@ -92,7 +115,29 @@ tree of CAS objects, and the action-cache value points at the root. Apple
 does not document the node layout; the diagram shows the shape the protocol
 permits.
 
-![An Action Cache key resolves to a value whose entry points at a root CASObject; the root references object-code, diagnostics, dependency-record, and precompiled-module CASObjects, which in turn reference raw CASBlob leaves.](cas-object-graph.svg)
+```mermaid
+flowchart TB
+accTitle: CAS Object Graph
+accDescr: An Action Cache key resolves to a value whose entry points at a root CASObject; the root references object-code, diagnostics, dependency-record, and precompiled-module CASObjects, which in turn reference raw CASBlob leaves.
+    AK["Action Cache key<br/>(digest of inputs, flags, toolchain)"]
+    AV["Action Cache value<br/>entries.value points at root CAS ID"]
+    ROOT["CASObject: compilation result<br/>blob: result metadata<br/>references below"]
+    OBJ_O["CASObject: object code (.o)"]
+    DIAG["CASObject: diagnostics"]
+    DEPS["CASObject: dependency record"]
+    PCM["CASObject: precompiled module<br/>(shared by many results)"]
+    LEAF1["CASBlob: raw bytes"]
+    LEAF2["CASBlob: raw bytes"]
+
+    AK -- "GetValue" --> AV
+    AV -- "Get(root)" --> ROOT
+    ROOT --> OBJ_O
+    ROOT --> DIAG
+    ROOT --> DEPS
+    ROOT --> PCM
+    OBJ_O --> LEAF1
+    PCM --> LEAF2
+```
 
 Three properties follow from content addressing:
 
@@ -112,7 +157,54 @@ same action on another machine. The client is the CAS plugin loaded by the
 Xcode toolchain; which process holds the socket connection is not documented
 and does not affect the protocol.
 
-![A miss path (GetValue KEY_NOT_FOUND, compile, Save and Put the result, PutValue) followed by a hit path on another machine (GetValue SUCCESS, Get and Load reuse the cached CAS objects, compiler not run) and an error path (GetValue ERROR, compile locally, build continues).](build-sequence.svg)
+```mermaid
+sequenceDiagram
+accTitle: Build Sequence
+accDescr: A miss path (GetValue KEY_NOT_FOUND, compile, Save and Put the result, PutValue) followed by a hit path on another machine (GetValue SUCCESS, Get and Load reuse the cached CAS objects, compiler not run) and an error path (GetValue ERROR, compile locally, build continues).
+    autonumber
+    participant C1 as Xcode toolchain (machine A)
+    participant X as X8 proxy (Unix socket)
+    participant S as S3-compatible bucket
+    participant C2 as Xcode toolchain (machine B)
+
+    Note over C1,X: Miss path
+    C1->>C1: compute action key K from inputs
+    C1->>X: KeyValueDB.GetValue(K)
+    X->>S: GET action-cache/K
+    S-->>X: 404
+    X-->>C1: outcome = KEY_NOT_FOUND
+    C1->>C1: run compiler
+    C1->>X: CASDBService.Save(blob: .o bytes)
+    X->>S: PUT cas/id_o
+    X-->>C1: cas_id = id_o
+    C1->>X: CASDBService.Put(result metadata blob referencing id_o)
+    X->>S: PUT cas/id_root
+    X-->>C1: cas_id = id_root
+    C1->>X: KeyValueDB.PutValue(K, value pointing at id_root)
+    X->>S: PUT action-cache/K
+    X-->>C1: ok
+
+    Note over C2,X: Hit path
+    C2->>C2: compute the same action key K
+    C2->>X: KeyValueDB.GetValue(K)
+    X->>S: GET action-cache/K
+    S-->>X: value
+    X-->>C2: outcome = SUCCESS, value
+    C2->>X: CASDBService.Get(id_root)
+    X->>S: GET cas/id_root
+    X-->>C2: SUCCESS with CASObject blob and references
+    C2->>X: CASDBService.Load(id_o, write_to_disk = true)
+    X->>S: GET cas/id_o (streamed)
+    X-->>C2: SUCCESS, file_path
+    C2->>C2: materialize outputs, compiler not run
+
+    Note over C2,S: Error path
+    C2->>X: KeyValueDB.GetValue(K prime)
+    X->>S: GET action-cache/K-prime
+    S-->>X: 503
+    X-->>C2: outcome = ERROR, description
+    C2->>C2: compile locally, build continues
+```
 
 Notes on the diagram:
 
@@ -130,7 +222,39 @@ Notes on the diagram:
 X8 is a protocol adapter. Each layer knows only the layer below it, and the
 opaque identifiers pass through every layer unchanged.
 
-![Xcode connects over gRPC to X8Kit's server, whose CAS and Action Cache services delegate to X8Storage's provider-neutral CASStore/ActionCacheStore boundary, which X8S3 maps onto S3 keys and a versioned envelope in the bucket.](protocol-adapter-layers.svg)
+```mermaid
+flowchart TB
+accTitle: Protocol Adapter Layers
+accDescr: Xcode connects over gRPC to X8Kit's server, whose CAS and Action Cache services delegate to X8Storage's provider-neutral CASStore/ActionCacheStore boundary, which X8S3 maps onto S3 keys and a versioned envelope in the bucket.
+    XC["Xcode / xcodebuild<br/>toolchain CAS plugin"]
+    SOCK["Unix-domain socket<br/>COMPILATION_CACHE_REMOTE_SERVICE_PATH"]
+    subgraph KIT["X8Kit — gRPC server over the socket"]
+        direction LR
+        CASSVC["XcodeCacheCASService<br/>CASDBService"]
+        KVSVC["XcodeCacheActionCacheService<br/>KeyValueDB"]
+        WIRE["XcodeCacheWire<br/>inline bytes to ByteStream<br/>file_path to response file store"]
+    end
+    subgraph STORAGE["X8Storage — provider-neutral boundary"]
+        direction LR
+        CS["CASStore<br/>get / put / load / save"]
+        AS["ActionCacheStore<br/>getValue / putValue"]
+    end
+    subgraph S3["X8S3 — S3Storage"]
+        direction LR
+        KEYS["S3 key space<br/>cas/hex-id, action-cache/hex-key"]
+        CODEC["S3StorageCodec<br/>versioned envelope: refs + payload"]
+    end
+    BUCKET[("S3-compatible bucket")]
+
+    XC -- "gRPC" --> SOCK --> KIT
+    CASSVC --> WIRE
+    CASSVC --> CS
+    KVSVC --> AS
+    CS --> S3
+    AS --> S3
+    KEYS --> BUCKET
+    CODEC --> BUCKET
+```
 
 Responsibilities per layer:
 
@@ -157,7 +281,23 @@ Responsibilities per layer:
 Both entry points run the same server; they differ in who owns the socket and
 for how long. <doc:XcodeCacheRuntime> describes the lifecycle mechanics.
 
-![x8 xcodebuild starts a private socket for one invocation and removes it on exit; x8 serve starts a stable per-profile socket that any number of builds can reuse until it is stopped by signal or shutdown.](socket-lifecycles.svg)
+```mermaid
+flowchart LR
+accTitle: Socket Lifecycles
+accDescr: x8 xcodebuild starts a private socket for one invocation and removes it on exit; x8 serve starts a stable per-profile socket that any number of builds can reuse until it is stopped by signal or shutdown.
+    subgraph A["x8 xcodebuild (invocation-scoped)"]
+        direction LR
+        A1["XcodeCacheSession.start"] --> A2["private socket under /private/tmp/x8/x8-cache-uuid/"]
+        A2 --> A3["xcodebuild with COMPILATION_CACHE_* and *_PREFIX_MAPPING overrides"]
+        A3 --> A4["xcodebuild exits: session.shutdown, socket and directory removed"]
+    end
+    subgraph B["x8 serve (long-lived)"]
+        direction LR
+        B1["XcodeServeRunner.start"] --> B2["stable socket<br/>Application Support/X8/profileID/listener.sock"]
+        B2 --> B3["any number of xcodebuild / Xcode GUI builds<br/>configured with the printed settings"]
+        B3 --> B4["SIGINT / SIGTERM or handle.shutdown"]
+    end
+```
 
 | | `x8 xcodebuild` | `x8 serve` |
 | --- | --- | --- |
