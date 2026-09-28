@@ -54,6 +54,23 @@ jobs:
         env:
           REPOSITORY_NAME: ${{ github.event.repository.name }}
 
+      - name: Redirect site root to documentation
+        run: |
+          cat > .build/docs/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=./documentation/">
+              <link rel="canonical" href="./documentation/">
+              <title>X8 Documentation</title>
+            </head>
+            <body>
+              <p>Redirecting to the <a href="./documentation/">X8 documentation</a>.</p>
+            </body>
+          </html>
+          HTML
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
