@@ -40,8 +40,8 @@ compiles, every other machine can download instead of rebuilding.
 ## How it works
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="Diagrams/how-it-works~dark.svg">
-  <img alt="xcodebuild or Xcode.app talks the Compilation Cache protocol over a Unix socket to the x8 proxy, which reads and writes objects in an S3-compatible bucket" src="Diagrams/how-it-works.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="asset/how-it-works~dark.svg">
+  <img alt="xcodebuild or Xcode.app talks the Compilation Cache protocol over a Unix socket to the x8 proxy, which reads and writes objects in an S3-compatible bucket" src="asset/how-it-works.svg">
 </picture>
 
 A handful of build settings point Xcode's Compilation Cache plugin at a local
