@@ -25,4 +25,3 @@ schema for other storage providers.
 - ``X8Configuration``
 - ``X8ConfigurationDocument``
 - ``RemoteCacheCredentials``
-- <doc:Configuration>

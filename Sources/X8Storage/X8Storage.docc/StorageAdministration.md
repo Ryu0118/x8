@@ -34,14 +34,12 @@ revision are retained because their age or identity cannot be proved safely.
 
 ## CAS cleanup
 
-CAS cleanup is reachability-based. The live root set comes from two sources:
-every current Action Cache value (via an injected `(ActionCacheValue) throws
--> [CASDataID]?` closure — see `X8Kit`'s `ActionCacheRootExtractor` for the
-concrete decoder), plus any explicit roots and leases in
-``CASRetentionStore``. ``CASReferenceReader`` traverses each immutable
-object's ordered references from that combined root set. The purge refuses
-to plan when the retention snapshot is not authoritative, when a referenced
-object is missing, or when the graph exceeds the safety bound.
+CAS cleanup is reachability-based. Its roots come from decoding current Action
+Cache values plus any explicit roots and leases in ``CASRetentionStore``. The
+purge caller supplies the Action Cache decoder. ``CASReferenceReader`` follows
+each immutable object's ordered references from that combined root set. The
+purge refuses to plan when the retention snapshot is not authoritative, when a
+referenced object is missing, or when the graph exceeds the safety bound.
 
 An S3 backend's retention namespace is authoritative when its documents are
 valid and either an explicit X8 retention marker exists or the namespace has

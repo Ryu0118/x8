@@ -26,8 +26,8 @@ key and value, and the CAS records referenced by its result metadata.
 See <doc:StorageAdministration> for the separate listing, revision, retention,
 and purge contracts.
 
-See <doc:ImplementingStorage> to build a storage implementation for an
-independent executable using X8CLI or X8Kit.
+See <doc:ImplementingStorage> to build a storage implementation for a custom
+executable using ``X8CLI``.
 
 ## Storage Flow
 
