@@ -10,8 +10,8 @@ storage implementation, and asynchronous cleanup when required. You do not
 implement another command tree or a CLI-specific storage protocol.
 
 `X8CLI` owns argument parsing, command output, and the external `xcodebuild`
-process adapter. ``X8Storage`` defines the CAS, Action Cache, and optional
-administration contracts.
+process adapter. The [X8Storage library](https://ryu0118.github.io/x8/documentation/x8storage)
+defines the CAS, Action Cache, and optional administration contracts.
 
 The shared CLI does not import X8Config or S3. Your executable chooses its own
 configuration files, schema, environment variables, and authentication. The

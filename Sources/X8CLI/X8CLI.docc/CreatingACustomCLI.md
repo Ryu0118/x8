@@ -40,11 +40,12 @@ let package = Package(
 
 ## Implement your provider adapter
 
-Your storage type must conform to both ``CASStore`` and
-``ActionCacheStore``. `CASStore` handles immutable CAS objects and their
-references; `ActionCacheStore` stores opaque action keys and result values.
+Your storage type must conform to both `CASStore` and `ActionCacheStore`.
+`CASStore` handles immutable CAS objects and their references;
+`ActionCacheStore` stores opaque action keys and result values.
 Preserve opaque identifiers, return `nil` only for confirmed misses, and keep
-payloads streamed. See <doc:ImplementingStorage> for the contract details.
+payloads streamed. See the [storage contract guide](https://ryu0118.github.io/x8/documentation/x8storage/implementingstorage)
+for details.
 
 The shared CLI owns the command tree. Your executable owns the provider SDK,
 configuration schema, and credentials. The configuration loader should read
@@ -55,6 +56,11 @@ and validate local settings; open the remote client in the storage factory.
 `configuration` returns `X8CLIConfiguration` with your typed settings in
 `value`. Give each cache domain a stable, non-secret `profileID`; never put
 credentials or signed URLs in `displayFields`, which `config show` prints.
+The profile ID must be 1–64 ASCII letters, digits, hyphens, or underscores.
+Include the storage kind and cache domain in it, and leave access roles out so
+all commands address the same cache identity. If you set `socketPath`, use an
+absolute path shorter than 104 UTF-8 bytes. `role` controls Xcode cache traffic;
+it does not grant or restrict the provider's cloud permissions.
 The storage factory is asynchronous and receives that `value`:
 
 ```swift
@@ -82,8 +88,8 @@ terminating the process.
 
 `CASStore` and `ActionCacheStore` are sufficient for Xcode cache reads and
 writes. The shared command tree still contains `cache purge`; age-based purge
-also needs ``CacheAdministration``, and reachability-based CAS purge additionally
-needs ``CASReferenceReader`` and ``CASRetentionStore``. Implement these only
+also needs `CacheAdministration`, and reachability-based CAS purge additionally
+needs `CASReferenceReader` and `CASRetentionStore`. Implement these only
 when your provider can satisfy their revision and retention guarantees.
 
 ## Run the example

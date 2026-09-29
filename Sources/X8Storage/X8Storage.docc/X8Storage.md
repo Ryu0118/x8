@@ -26,8 +26,8 @@ key and value, and the CAS records referenced by its result metadata.
 See <doc:StorageAdministration> for the separate listing, revision, retention,
 and purge contracts.
 
-See <doc:ImplementingStorage> to build a storage implementation for a custom
-executable using ``X8CLI``.
+See <doc:ImplementingStorage> to build the provider. The executable connects it
+to the shared commands through the [X8CLI library](https://ryu0118.github.io/x8/documentation/x8cli).
 
 ## Storage Flow
 
