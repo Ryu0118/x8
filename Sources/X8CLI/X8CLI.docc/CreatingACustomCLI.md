@@ -1,79 +1,100 @@
-# Creating a custom CLI
+# Build an executable for custom storage
 
-Reuse x8's commands while supplying your own storage and configuration.
+The official `x8` executable supports S3-compatible storage only. It has no
+runtime backend plug-in. To cache in another service, build a separate Swift
+executable with `X8CLI` and provide your own storage implementation.
 
-## Choose the reusable surface
+## Add the package products
 
-Use `X8CLI` for the same `xcodebuild`, `serve`, `config`, `doctor`, and
-`cache purge` interface as the official executable. `X8CLI` is the only
-supported entry point for a custom executable; `X8Kit`, the cache use cases
-behind those commands, is an internal implementation detail of `X8CLI` and is
-not a separate public library.
-
-The official `x8` binary continues to support S3-compatible storage only.
-Installing a separate storage package does not add storage choices to that binary.
-
-## Add the library products
-
-Add the X8 package to your executable's SwiftPM dependencies with the `S3`
-trait disabled. Add the `X8CLI` and `X8Storage` products to your executable
-target, plus `X8Core` if your storage implementation uses its domain types.
-Your own provider SDK remains a dependency of your storage implementation.
-
-The [complete example package](https://github.com/Ryu0118/x8/tree/main/Examples/CustomStorageCLI)
-uses a local X8 dependency so it can be built against unreleased source. In a
-separate repository, use a released version of the X8 GitHub package instead.
-
-## Connect your implementation
-
-The example's executable has this entire entry point:
+Add `X8CLI`, `X8Storage`, and `X8Core` to your executable target. Disable the
+optional S3 trait so your executable does not build the official S3 adapter.
+This repository has no tagged package releases yet, so the manifest below
+uses the `main` branch; replace it with a release version when one is available.
 
 ```swift
-import X8CLI
+// swift-tools-version: 6.4
+import PackageDescription
 
-@main
-struct ExampleCache {
-    static func main() async {
-        let cli = X8CLI(
-            configuration: ExampleConfiguration.load,
-            storage: { _ in ExampleMemoryStorage() }
-        )
-        await cli.main()
-    }
-}
+let package = Package(
+    name: "MyCache",
+    platforms: [.macOS("26.0")],
+    dependencies: [
+        .package(
+            url: "https://github.com/Ryu0118/x8.git",
+            branch: "main",
+            traits: []
+        ),
+    ],
+    targets: [
+        .executableTarget(
+            name: "MyCache",
+            dependencies: [
+                .product(name: "X8CLI", package: "x8"),
+                .product(name: "X8Storage", package: "x8"),
+                .product(name: "X8Core", package: "x8"),
+            ]
+        ),
+    ]
+)
 ```
 
-`ExampleConfiguration` and `ExampleMemoryStorage` are supplied by the example
-package, not by X8. Replace them with your own configuration and storage types.
-The storage factory receives the exact `value` returned by your configuration
-loader. A factory that needs it can use `storage: { MyStorage(configuration: $0) }`.
-The configuration closure is `async throws`, so filesystem or network-backed
-configuration loading can remain on the same async path as storage creation.
+## Implement your provider adapter
 
-Your storage must conform to both `CASStore` and `ActionCacheStore`. No
-additional CLI-specific conformance is required. If the client needs cleanup,
-pass `shutdown: { try await $0.shutdown() }`.
+Your storage type must conform to both ``CASStore`` and
+``ActionCacheStore``. `CASStore` handles immutable CAS objects and their
+references; `ActionCacheStore` stores opaque action keys and result values.
+Preserve opaque identifiers, return `nil` only for confirmed misses, and keep
+payloads streamed. See <doc:ImplementingStorage> for the contract details.
 
-## Exercise the example
+The shared CLI owns the command tree. Your executable owns the provider SDK,
+configuration schema, and credentials. The configuration loader should read
+and validate local settings; open the remote client in the storage factory.
 
-From `Examples/CustomStorageCLI`:
+## Connect configuration and storage
+
+`configuration` returns `X8CLIConfiguration` with your typed settings in
+`value`. Give each cache domain a stable, non-secret `profileID`; never put
+credentials or signed URLs in `displayFields`, which `config show` prints.
+The storage factory is asynchronous and receives that `value`:
+
+```swift
+let cli = X8CLI(
+    configuration: MyConfiguration.load,
+    storage: { settings in
+        try await MyStorage.connect(settings)
+    },
+    shutdown: { try await $0.shutdown() }
+)
+await cli.main()
+```
+
+The CLI calls `shutdown` once after the command's storage work finishes. Pass
+it when your adapter owns a client or other resource that needs asynchronous
+cleanup. If constructing storage fails partway through, the factory must clean
+up resources it created before throwing.
+
+The official `.x8.yml` file and its S3 schema are not used by your executable.
+Help and configuration-only commands do not open storage. For an embedded
+host process, call `await cli.run(arguments:)`; it returns a status without
+terminating the process.
+
+## Optional administration
+
+`CASStore` and `ActionCacheStore` are sufficient for Xcode cache reads and
+writes. The shared command tree still contains `cache purge`; age-based purge
+also needs ``CacheAdministration``, and reachability-based CAS purge additionally
+needs ``CASReferenceReader`` and ``CASRetentionStore``. Implement these only
+when your provider can satisfy their revision and retention guarantees.
+
+## Run the example
+
+The [complete example package](https://github.com/Ryu0118/x8/tree/main/Examples/CustomStorageCLI)
+shows the manifest, configuration, and storage adapter. Its backend stores
+bounded records in memory; data disappears when the process exits. Replace it
+with a persistent provider for a shared remote cache.
 
 ```sh
-swift run ExampleCache --help
-EXAMPLE_CACHE_DOMAIN=demo swift run ExampleCache config show
+cd Examples/CustomStorageCLI
 EXAMPLE_CACHE_DOMAIN=demo swift run ExampleCache doctor
 EXAMPLE_CACHE_DOMAIN=demo swift run ExampleCache serve --print-cache-settings
 ```
-
-The example deliberately uses bounded in-memory storage. Records disappear on
-exit; it is not a persistent or remote cache. It omits administrative capabilities,
-so `cache purge` reports that administration is unsupported.
-
-`main()` exits with the command's status after cleanup. For tests or repeated
-invocations inside a host process, use `await cli.run(arguments: [...])`; it
-returns an `Int32` status without calling `exit`. The command tree, including
-the `x8` name in usage text, is shared with the official executable.
-
-X8CLI has no S3 or YAML compilation dependency. SwiftPM may still fetch
-packages that belong to other products; the example README describes how to
-check downloads separately from the target dependency graph.
