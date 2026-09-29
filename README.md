@@ -208,7 +208,7 @@ even if no detached process was running for the current profile.
 > remain uncached in GUI builds. This does not affect apps without local
 > package dependencies or builds through `x8 xcodebuild`. See
 > [Prefix mapping and cache portability](https://ryu0118.github.io/x8/documentation/x8cli/prefixmapping)
-> describes the affected GUI builds and the command-line alternative.
+> for the affected GUI builds and the command-line alternative.
 
 ## Configuration
 
