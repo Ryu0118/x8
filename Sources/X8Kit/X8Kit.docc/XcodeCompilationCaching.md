@@ -30,7 +30,8 @@ The three build settings that wire this up are:
 X8's cache-settings contract emits these three values plus six
 prefix-mapping settings: four enable flags and two mapping-value settings
 and an empty `CLANG_MODULES_BUILD_SESSION_FILE`, described in
-<doc:PrefixMapping>. Xcode's build system resolves them as
+the [prefix-mapping guide](https://ryu0118.github.io/x8/documentation/x8cli/prefixmapping).
+Xcode's build system resolves them as
 build settings rather than inherited environment, so `x8 xcodebuild` appends
 them as `SETTING=VALUE` command-line overrides; the standalone
 `x8 serve --print-cache-settings` output is the same contract for a client

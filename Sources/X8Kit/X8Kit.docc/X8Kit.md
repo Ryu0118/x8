@@ -43,5 +43,5 @@ profile identifiers.
 ## Topics
 
 - <doc:XcodeCompilationCaching>
-- <doc:PrefixMapping>
 - <doc:XcodeCacheRuntime>
+- [Prefix mapping and cache portability](https://ryu0118.github.io/x8/documentation/x8cli/prefixmapping)
