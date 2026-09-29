@@ -13,7 +13,7 @@ rules:
   - Sources/X8CLI/X8CLIConfiguration.swift
   - Sources/X8CLI/X8ProfileIDValidator.swift
   - Sources/X8CLI/X8ConfigurationResolution.swift
-  doc: Sources/X8CLI/X8CLI.docc/ConnectingConfiguration.md
+  doc: Sources/X8CLI/X8CLI.docc/CreatingACustomCLI.md
   message: CLI configuration contracts changed - verify configuration ownership and
     validation documentation.
   checksum: efaa13242afc1caf0ceca2206e0e25c9cca6ad49ac0ff2f15108fb077efbb62c
@@ -24,7 +24,7 @@ rules:
   - Sources/X8CLI/ServeCommand.swift
   - Sources/X8CLI/XcodeBuildCommand.swift
   - Sources/X8CLI/CachePurgeCommand.swift
-  doc: Sources/X8CLI/X8CLI.docc/StorageLifetime.md
+  doc: Sources/X8CLI/X8CLI.docc/CreatingACustomCLI.md
   message: Storage ownership or capabilities changed - verify lifetime and administration
     documentation.
   checksum: 16fca6b364d5eb679e47c2695ec8596e51a3c36bb603dc6b1dac49252aa3d5ac
