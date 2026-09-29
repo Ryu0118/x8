@@ -15,12 +15,15 @@ TITLE = re.compile(r"(?m)^\s*accTitle:\s*(.*?)\s*$")
 DESCRIPTION = re.compile(r"(?m)^\s*accDescr:\s*(.*?)\s*$")
 
 
-def prepare(root: Path, work_dir: Path, manifest_path: Path) -> None:
+def prepare(root: Path, work_dir: Path, site_dir: Path, manifest_path: Path) -> None:
     diagrams: list[dict[str, str]] = []
     used_names: set[tuple[str, str]] = set()
+    published_modules = site_dir / "data" / "documentation"
 
     for catalog in sorted((root / "Sources").glob("*/*.docc")):
         module = catalog.parent.name
+        if not (published_modules / module.lower()).is_dir():
+            continue
         for article in sorted(catalog.glob("*.md")):
             content = article.read_text()
             for source in FENCE.findall(content):
@@ -170,11 +173,19 @@ def embed(site: Path, manifest_path: Path) -> None:
 
 def main() -> None:
     if len(sys.argv) < 2:
-        raise SystemExit("usage: mermaid-docs.py prepare ROOT WORK_DIR MANIFEST | embed SITE MANIFEST | render-inputs MANIFEST")
+        raise SystemExit(
+            "usage: mermaid-docs.py prepare ROOT WORK_DIR SITE MANIFEST | "
+            "embed SITE MANIFEST | render-inputs MANIFEST"
+        )
 
     command = sys.argv[1]
-    if command == "prepare" and len(sys.argv) == 5:
-        prepare(Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4]))
+    if command == "prepare" and len(sys.argv) == 6:
+        prepare(
+            Path(sys.argv[2]),
+            Path(sys.argv[3]),
+            Path(sys.argv[4]),
+            Path(sys.argv[5]),
+        )
     elif command == "embed" and len(sys.argv) == 4:
         embed(Path(sys.argv[2]), Path(sys.argv[3]))
     elif command == "render-inputs" and len(sys.argv) == 3:

@@ -43,7 +43,7 @@ render_diagram() {
 }
 
 MANIFEST="$WORK_DIR/manifest.json"
-python3 "$ROOT/scripts/mermaid-docs.py" prepare "$ROOT" "$WORK_DIR" "$MANIFEST"
+python3 "$ROOT/scripts/mermaid-docs.py" prepare "$ROOT" "$WORK_DIR" "$SITE_DIR" "$MANIFEST"
 while IFS= read -r source; do
   module="$(basename "$(dirname "$source")")"
   name="$(basename "$source" .mmd)"
