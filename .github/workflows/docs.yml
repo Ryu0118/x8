@@ -46,11 +46,9 @@ jobs:
             --traits S3 \
             generate-documentation \
             --target X8CLI \
-            --target X8Kit \
             --target X8Storage \
             --target X8Core \
             --target X8Config \
-            --target X8S3 \
             --enable-experimental-combined-documentation \
             --disable-indexing \
             --transform-for-static-hosting \
