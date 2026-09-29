@@ -7,12 +7,11 @@
 [![Swift](https://img.shields.io/badge/Swift-6.4-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![Platform](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey)](https://developer.apple.com/macos/)
 
-Xcode already caches compiled Swift/Clang modules, but that cache lives on
-each machine: a module built on one Mac is built again on every other Mac and
-CI runner. x8 lets a team share one cache instead. It speaks Xcode's cache
-protocol over a local Unix domain socket and stores the cached objects in AWS
-S3, Cloudflare R2, or any other S3-compatible bucket, so whatever one machine
-compiles, every other machine can download instead of rebuilding.
+Xcode's compilation cache normally stays on the machine that produced it. x8
+lets Macs and CI runners share that cache through a local proxy and an
+S3-compatible bucket. The official `x8` executable uses S3-compatible storage;
+for another storage provider, build a separate executable with the `X8CLI`
+library and your own storage adapter.
 
 ## Features
 
@@ -20,21 +19,20 @@ compiles, every other machine can download instead of rebuilding.
   Macs and CI runners instead of rebuilding the same modules everywhere.
 - ⚙️ **Drop-in `xcodebuild` proxy:** Wrap `xcodebuild` with `x8 xcodebuild`, or
   run a standalone proxy with `x8 serve` for Xcode.app GUI builds.
-- 🔌 **Any S3-compatible provider:** AWS S3, Cloudflare R2, MinIO, or another
-  provider, without backend lock-in.
+- 🔌 **Flexible storage:** Use S3-compatible storage with the official
+  executable, or connect your own backend through `X8CLI`.
 
 ## Table of Contents
 
 - [How it works](#how-it-works)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Custom storage](#custom-storage)
 - [Enabling the remote cache](#enabling-the-remote-cache)
   - [`xcodebuild`](#1-xcodebuild)
   - [Xcode.app GUI builds](#2-xcodeapp-gui-builds)
 - [Configuration](#configuration)
 - [Commands](#commands)
-- [Using another storage implementation](#using-another-storage-implementation)
-- [Documentation](#documentation)
 - [License](#license)
 
 ## How it works
@@ -44,17 +42,15 @@ compiles, every other machine can download instead of rebuilding.
   <img alt="xcodebuild or Xcode.app talks the Compilation Cache protocol over a Unix socket to the x8 proxy, which reads and writes objects in an S3-compatible bucket" src="asset/how-it-works.svg">
 </picture>
 
-A handful of build settings point Xcode's Compilation Cache plugin at a local
-socket. x8 listens on that socket, speaks the gRPC protocol the plugin
-expects, and translates each cache lookup or upload into a read or write of
-one object in your bucket using an S3 `GetObject` or `PutObject` request. That
-is why any S3-compatible provider works.
+Xcode's Compilation Cache plugin connects to a local socket served by x8. The
+official executable stores cache records in an S3-compatible bucket. A custom
+executable can use the same commands with an adapter for another provider.
 
 ## Installation
 
-x8 needs Xcode 27 or later (which itself requires macOS 26) and an
-S3-compatible bucket such as AWS S3, Cloudflare R2, or MinIO. That is all you
-need to get started.
+The official `x8` executable needs Xcode 27 or later (on macOS 26 or later) and
+an S3-compatible bucket such as AWS S3, Cloudflare R2, or MinIO. A custom
+storage executable uses the provider you implement instead.
 
 ### Nest ([mtj0928/nest](https://github.com/mtj0928/nest))
 
@@ -103,24 +99,12 @@ mise use -g github:Ryu0118/x8
      write: api
    ```
 
-2. Provide credentials. `source: defaultChain` uses your existing AWS setup
-   (for example `aws configure` or `aws sso login`). To use explicit keys
-   instead, such as R2 API tokens, set `credentials` to `static` and pass the
-   values through environment variables:
-
-   ```yaml
-   s3:
-     api:
-       # bucket, endpoint, ...
-       credentials:
-         source: static
-         accessKeyID: ${AWS_ACCESS_KEY_ID}
-         secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
-   ```
-
-   Never commit a literal secret value. See [Configuring x8 with
+2. Provide credentials. `defaultChain` uses your existing AWS setup, including
+   environment credentials, profiles, SSO, and supported role flows. For R2 or
+   MinIO, use `static` credentials expanded from environment variables. Never
+   commit secret values; see [Configuring x8 with
    .x8.yml](https://ryu0118.github.io/x8/documentation/x8config/configurationfile)
-   for every option.
+   for the complete schema.
 
 3. Confirm everything is wired up:
 
@@ -137,6 +121,16 @@ mise use -g github:Ryu0118/x8
    That's all a command-line build needs. Building from Xcode.app uses a
    long-running `x8 serve` plus a few build settings. See [Xcode.app GUI
    builds](#2-xcodeapp-gui-builds) below.
+
+## Custom storage
+
+The official `x8` executable is S3-only; installing another provider package
+does not add a backend to it. To cache through GCS, Azure Blob, a filesystem,
+or another store, build your own executable with `X8CLI` and implement
+`CASStore` plus `ActionCacheStore`. Your executable owns its configuration and
+credentials. The [custom storage guide](https://ryu0118.github.io/x8/documentation/x8cli/creatingacustomcli)
+covers package setup and storage injection; the [example package](Examples/CustomStorageCLI)
+demonstrates the contracts with bounded in-memory storage.
 
 ## Enabling the remote cache
 
@@ -155,15 +149,15 @@ x8 xcodebuild -workspace MyApp.xcworkspace -scheme MyApp build
 ```
 
 Pass `xcodebuild`, or an absolute path ending in `xcodebuild` (for a specific
-Xcode.app), as the first argument; everything after it is forwarded to that
-executable unchanged. x8 preserves the caller's build arguments and chosen
-directories.
+Xcode.app), as the first argument. x8 forwards the remaining arguments and
+preserves the caller's build directories.
 
 x8 also makes the build portable across machines through *prefix mapping*,
 so a module built on your Mac can still be a cache hit on another machine.
 Pass `--no-prefix-mapping` (before the child `xcodebuild` argument) if your
-project already handles build-path portability itself. See
-[Prefix mapping](Sources/X8Kit/X8Kit.docc/PrefixMapping.md) for details.
+project already handles build-path portability itself. See [Prefix mapping
+and cache portability](https://ryu0118.github.io/x8/documentation/x8cli/prefixmapping)
+for supported cases and limitations.
 
 ### 2. Xcode.app GUI builds
 
@@ -175,34 +169,17 @@ send cache traffic to x8's socket and to record build paths as portable
 `/^…` placeholders instead of machine-specific absolute paths, so cache
 entries match across machines.
 
-Start the long-lived proxy; it prints the exact `SETTING=VALUE` pairs to add,
-so you don't need to understand prefix mapping to use them. Run it from the
-project directory containing `.x8.yml`; `--workspace-directory` only matters
-when the Xcode workspace root is a different directory from where `.x8.yml`
-lives:
+Start the long-lived proxy from the directory containing `.x8.yml`. It prints
+the `SETTING=VALUE` pairs to add. Use `--workspace-directory` when the Xcode
+workspace root differs from the current directory:
 
 ```sh
 x8 serve --workspace-directory /path/to/workspace
 ```
 
-```text
-CLANG_ENABLE_PREFIX_MAPPING=YES
-CLANG_ENABLE_PROJECT_PREFIX_MAPPING=YES
-CLANG_MODULES_BUILD_SESSION_FILE=
-CLANG_OTHER_PREFIX_MAPPINGS=$(PROJECT_TEMP_DIR)=/^derived $(BUILT_PRODUCTS_DIR)=/^built $(OBJROOT)/../..=/^dd /path/to/workspace=/^workspace
-COMPILATION_CACHE_ENABLE_CACHING=YES
-COMPILATION_CACHE_ENABLE_PLUGIN=YES
-COMPILATION_CACHE_REMOTE_SERVICE_PATH=/Users/you/Library/Application Support/X8/<profile-id>/cache.sock
-SWIFT_ENABLE_PREFIX_MAPPING=YES
-SWIFT_ENABLE_PROJECT_PREFIX_MAPPING=YES
-SWIFT_OTHER_PREFIX_MAPPINGS=$(PROJECT_TEMP_DIR)=/^derived $(BUILT_PRODUCTS_DIR)=/^built $(OBJROOT)/../..=/^dd /path/to/workspace=/^workspace
-```
-
-Copy each line into your target's (or `.xcconfig`'s) user-defined build
-settings exactly as printed. Keep `x8 serve` running so Xcode always has a
-socket to connect to, then build from Xcode.app as usual. Use the same
-logical `/^workspace` replacement on every machine; neither mode relocates
-build outputs.
+Copy the printed lines into the target's or `.xcconfig`'s user-defined build
+settings. Keep `x8 serve` running while building from Xcode.app. Use the same
+logical workspace prefix on every machine.
 
 Run `x8 serve -d` (or `--detach`) instead to start the proxy in the
 background and return once it is ready, printing the same cache settings
@@ -230,15 +207,8 @@ even if no detached process was running for the current profile.
 > propagate project settings to synthesized package targets, so those targets
 > remain uncached in GUI builds. This does not affect apps without local
 > package dependencies or builds through `x8 xcodebuild`. See
-> [Known limitation: GUI builds with SwiftPM multi-module targets](Sources/X8Kit/X8Kit.docc/PrefixMapping.md#known-limitation-gui-builds-with-swiftpm-multi-module-targets-dont-propagate-user-defined-settings-to-package-targets)
-> for details.
-
-## Watching live cache traffic
-
-`x8 tail` subscribes to the live cache-events socket and prints cache
-requests as they happen. Run it in another terminal from the project root
-while `x8 xcodebuild` is running. `x8 serve` prints its own live traffic in
-the terminal where it runs.
+> [Prefix mapping and cache portability](https://ryu0118.github.io/x8/documentation/x8cli/prefixmapping)
+> describes the affected GUI builds and the command-line alternative.
 
 ## Configuration
 
@@ -255,62 +225,16 @@ from a public URL without credentials, and pinning the socket path.
 | Command | Purpose |
 | --- | --- |
 | `x8 [xcodebuild] <xcodebuild> [args...]` | Run `xcodebuild` through an embedded, invocation-scoped cache proxy. |
-| `x8 serve` | Run a standalone proxy at a stable socket, for Xcode's GUI or a supervised long-lived process. |
-| `x8 serve --socket-path <path>` | Pin the socket to a fixed path for this invocation, overriding `.x8.yml`'s `socketPath` and the per-user default. |
-| `x8 serve -d` / `--detach` | Run the standalone proxy in the background and return once it is ready. |
-| `x8 serve stop` / `x8 serve stop --socket-path <path>` | Stop a detached `x8 serve -d` process for the current profile, or one pinned to a fixed socket path. |
-| `x8 tail` / `x8 tail --socket-path <path>` | Stream live cache traffic from a running `x8 serve` or `x8 xcodebuild` invocation, or one pinned to a fixed socket path. |
-| `x8 config validate` | Validate `.x8.yml` and its resolved values. |
-| `x8 config show` | Print resolved, non-secret configuration. |
-| `x8 doctor` | Check configuration, storage access, and the local proxy in one pass. |
-| `x8 cache purge` | Plan or delete aged staging/Action Cache objects, or unreachable CAS objects. |
+| `x8 serve` | Run the proxy for Xcode.app builds. Add `-d` to detach it. |
+| `x8 serve stop` | Stop a detached proxy. |
+| `x8 tail` | Stream cache traffic from a running proxy. |
+| `x8 config validate` / `show` | Validate or print resolved, non-secret configuration. |
+| `x8 doctor` | Check configuration, storage access, and the local proxy. |
+| `x8 cache purge` | Plan and optionally delete eligible cache records. |
 
-Run `x8 help <subcommand>` for full flag documentation. `cache purge`'s
-`--older-than` and `--grace-period` accept a number followed by `ms`, `s`,
-`m`, `h`, or `d` (for example `30m`, `2h`, or `7d`).
-
-## Using another storage implementation
-
-The official `x8` executable supports S3-compatible storage only. To use another
-storage implementation, such as one you write for GCS or Azure, build your own
-executable with the **X8CLI** library. It provides the same command definitions,
-argument handling, and execution behavior:
-
-```swift
-let cli = X8CLI(
-    configuration: loadConfiguration,
-    storage: { MyStorage(configuration: $0) },
-    shutdown: { try await $0.shutdown() }
-)
-await cli.main()
-```
-
-Supply your own configuration loader and a storage type conforming to
-`CASStore` and `ActionCacheStore`. No CLI-specific storage protocol is required.
-The configuration loader is an `async throws` closure, so loading configuration
-and opening storage share one async execution path.
-Your executable owns its configuration format and authentication; `.x8.yml`
-and its S3 schema remain specific to the official executable. Administrative
-commands additionally require the corresponding X8Storage capabilities.
-
-Start with the [custom CLI guide](https://ryu0118.github.io/x8/documentation/x8cli/creatingacustomcli/)
-and the [complete example package](Examples/CustomStorageCLI).
-
-## Documentation
-
-Full API documentation is published at
-[ryu0118.github.io/x8/documentation/x8cli](https://ryu0118.github.io/x8/documentation/x8cli/).
-
-- [Configuring x8 with .x8.yml](https://ryu0118.github.io/x8/documentation/x8config/configurationfile)
-  lists every `.x8.yml`/`.x8.local.yml` key and covers overlays, credential-free
-  public-URL reads, and the socket path.
-- [Prefix mapping](https://ryu0118.github.io/x8/documentation/x8kit/prefixmapping)
-  explains how build paths are made portable across machines, the toolchain
-  requirement, and the known limitations. Read it when cache hits are lower
-  than expected or a build shape doesn't seem to cache.
-- [Creating a custom CLI](https://ryu0118.github.io/x8/documentation/x8cli/creatingacustomcli/)
-  walks through building an executable on another storage backend. Read it
-  only if you need a non-S3 backend.
+Run `x8 help <subcommand>` for the full flag reference. Browse the [published
+documentation](https://ryu0118.github.io/x8/documentation/x8cli/) for API and
+configuration guides.
 
 ## License
 
