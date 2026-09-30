@@ -9,6 +9,7 @@ on:
       - 'Package.swift'
       - 'Package.resolved'
       - '.github/workflows/docs.yml'
+      - 'scripts/package-docs.py'
       - 'scripts/render-diagrams.sh'
       - 'scripts/mermaid-docs.py'
   workflow_dispatch:
@@ -49,6 +50,7 @@ jobs:
             --target X8Storage \
             --target X8Core \
             --target X8Config \
+            --target X8Kit \
             --enable-experimental-combined-documentation \
             --disable-indexing \
             --transform-for-static-hosting \
@@ -59,6 +61,9 @@ jobs:
 
       - name: Render and embed Mermaid diagrams
         run: ./scripts/render-diagrams.sh .build/docs
+
+      - name: Curate package-level documentation
+        run: python3 scripts/package-docs.py .build/docs
 
       - name: Redirect site root to documentation
         run: |
