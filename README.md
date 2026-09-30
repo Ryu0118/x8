@@ -103,7 +103,7 @@ mise use -g github:Ryu0118/x8
    environment credentials, profiles, SSO, and supported role flows. For R2 or
    MinIO, use `static` credentials expanded from environment variables. Never
    commit secret values; see [Configuring x8 with
-   .x8.yml](https://ryu0118.github.io/x8/documentation/x8config/configurationfile)
+   .x8.yml](https://ryu0118.github.io/x8/documentation/configurationfile)
    for the complete schema.
 
 3. Confirm everything is wired up:
@@ -156,7 +156,7 @@ x8 also makes the build portable across machines through *prefix mapping*,
 so a module built on your Mac can still be a cache hit on another machine.
 Pass `--no-prefix-mapping` (before the child `xcodebuild` argument) if your
 project already handles build-path portability itself. See [Prefix mapping
-and cache portability](https://ryu0118.github.io/x8/documentation/x8cli/prefixmapping)
+and cache portability](https://ryu0118.github.io/x8/documentation/prefixmapping)
 for supported cases and limitations.
 
 ### 2. Xcode.app GUI builds
@@ -207,7 +207,7 @@ even if no detached process was running for the current profile.
 > propagate project settings to synthesized package targets, so those targets
 > remain uncached in GUI builds. This does not affect apps without local
 > package dependencies or builds through `x8 xcodebuild`. See
-> [Prefix mapping and cache portability](https://ryu0118.github.io/x8/documentation/x8cli/prefixmapping)
+> [Prefix mapping and cache portability](https://ryu0118.github.io/x8/documentation/prefixmapping)
 > for the affected GUI builds and the command-line alternative.
 
 ## Configuration
@@ -217,7 +217,7 @@ x8 reads `.x8.yml` from the project root and an optional, git-ignored
 machine reads and writes the cache: `api` (signed S3 API), `publicURL` (reads
 only, no credentials), or `none`. Every value supports `$VAR` expansion.
 
-See [Configuring x8 with .x8.yml](https://ryu0118.github.io/x8/documentation/x8config/configurationfile) for every key, local overlays, reading
+See [Configuring x8 with .x8.yml](https://ryu0118.github.io/x8/documentation/configurationfile) for every key, local overlays, reading
 from a public URL without credentials, and pinning the socket path.
 
 ## Commands

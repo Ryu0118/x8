@@ -29,8 +29,8 @@ The three build settings that wire this up are:
 
 X8's cache-settings contract emits these three values plus six
 prefix-mapping settings: four enable flags and two mapping-value settings
-and an empty `CLANG_MODULES_BUILD_SESSION_FILE`, described in
-the [prefix-mapping guide](https://ryu0118.github.io/x8/documentation/x8cli/prefixmapping).
+and an empty `CLANG_MODULES_BUILD_SESSION_FILE`, described in the
+[prefix-mapping guide](https://ryu0118.github.io/x8/documentation/prefixmapping).
 Xcode's build system resolves them as
 build settings rather than inherited environment, so `x8 xcodebuild` appends
 them as `SETTING=VALUE` command-line overrides; the standalone
@@ -280,7 +280,7 @@ Responsibilities per layer:
 ## Two ways to expose the socket
 
 Both entry points run the same server; they differ in who owns the socket and
-for how long. <doc:XcodeCacheRuntime> describes the lifecycle mechanics.
+for how long. The table below summarizes their lifetime and configuration.
 
 ```mermaid
 flowchart LR

@@ -86,7 +86,7 @@ rules:
   - Sources/X8CLI/XcodeBuildCommand.swift
   - Sources/X8Kit/Server/XcodeCacheEnvironment.swift
   - Protos/compilation_cache_service/keyvalue/v1/compilation_caching_kv.proto
-  doc: Sources/X8Kit/X8Kit.docc/PrefixMapping.md
+  doc: Sources/X8CLI/X8CLI.docc/PrefixMapping.md
   message: Cache argument or protocol boundaries changed - verify path preservation,
     prefix mapping limits, and the scope of portability claims.
   checksum: 43363af00cd96a1979cd40de962987f07226e3ef0cba90c3402a1bbc8b51ba5d
