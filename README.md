@@ -138,6 +138,9 @@ There are two ways to point Xcode at x8's socket, depending on how you build.
 For command-line builds, `x8 xcodebuild` supplies the cache connection and
 prefix-mapping settings without changing build paths. For Xcode.app builds,
 configure the printed cache settings in the project or an `.xcconfig`.
+The [X8 cache setup guide](https://ryu0118.github.io/x8/documentation/xcodecacheruntime)
+explains how the two modes work, how to apply the generated settings, and what
+to check when builds do not reuse results.
 
 ### 1. `xcodebuild`
 

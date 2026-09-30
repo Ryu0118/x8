@@ -17,9 +17,11 @@ HIDDEN_MODULES = {"X8Config", "X8Kit"}
 ARTICLES = (
     ("X8CLI", "PrefixMapping", "prefixmapping"),
     ("X8Config", "ConfigurationFile", "configurationfile"),
-    ("X8Kit", "XcodeCompilationCaching", "xcodecompilationcaching"),
     ("X8Kit", "XcodeCacheRuntime", "xcodecacheruntime"),
 )
+RETIRED_ARTICLE_REDIRECTS = {
+    "xcodecompilationcaching": "xcodecacheruntime",
+}
 
 
 def read_json(path: Path) -> Any:
@@ -292,6 +294,13 @@ def promote_articles(site: Path) -> None:
         (documentation_data / f"{module.lower()}.json").unlink(missing_ok=True)
         shutil.rmtree(documentation_data / module.lower(), ignore_errors=True)
         shutil.rmtree(site / "documentation" / module.lower(), ignore_errors=True)
+
+    for old_slug, new_slug in RETIRED_ARTICLE_REDIRECTS.items():
+        old_directory = site / "documentation" / old_slug
+        new_directory = site / "documentation" / new_slug
+        old_directory.mkdir(parents=True, exist_ok=True)
+        relative_target = os.path.relpath(new_directory, old_directory)
+        (old_directory / "index.html").write_text(redirect_page(f"{relative_target}/"))
 
     for article in promoted:
         old_directory = route_directory(site, article["old_route"])

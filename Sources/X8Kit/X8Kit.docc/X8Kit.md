@@ -42,5 +42,4 @@ profile identifiers.
 
 ## Topics
 
-- <doc:XcodeCompilationCaching>
 - <doc:XcodeCacheRuntime>
