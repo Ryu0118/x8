@@ -280,7 +280,7 @@ Responsibilities per layer:
 ## Two ways to expose the socket
 
 Both entry points run the same server; they differ in who owns the socket and
-for how long. The table below summarizes their lifetime and configuration.
+for how long. <doc:XcodeCacheRuntime> describes their lifecycle mechanics.
 
 ```mermaid
 flowchart LR

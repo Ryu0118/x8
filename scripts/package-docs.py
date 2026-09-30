@@ -18,6 +18,7 @@ ARTICLES = (
     ("X8CLI", "PrefixMapping", "prefixmapping"),
     ("X8Config", "ConfigurationFile", "configurationfile"),
     ("X8Kit", "XcodeCompilationCaching", "xcodecompilationcaching"),
+    ("X8Kit", "XcodeCacheRuntime", "xcodecacheruntime"),
 )
 
 
