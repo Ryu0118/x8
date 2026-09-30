@@ -87,26 +87,64 @@ keep the logical workspace prefix the same on every machine. If you choose a
 custom `socketPath` in `.x8.yml` or pass `--socket-path`, use that same path
 when stopping the server. See [Pinning the socket path](https://ryu0118.github.io/x8/documentation/configurationfile#pinning-the-socket-path).
 
-## What gets shared
+## What gets shared between Macs?
 
-Xcode still uses its local DerivedData cache. X8 adds access to the remote
-cache selected by your configuration; changing the local socket path does not
-change that storage destination.
+Xcode keeps build files in this Mac's `DerivedData` folder. X8 does not move or
+share that folder. Instead, Xcode connects to an X8 service running on this
+Mac, and that service reads and writes compilation results in the remote
+storage configured for the project.
 
-A cached result can be reused only when the compilation inputs match. The
-source is one input; the Xcode version, compiler options, build settings, and
-dependencies matter too. Prefix mapping normalizes common paths, but it cannot
-make different compiler inputs equivalent. A cache miss is expected: Xcode
-compiles the work locally. If the remote cache reports an error, X8 keeps the
-build moving by letting Xcode compile locally. A machine only publishes new
-results if its storage configuration allows writes.
+The socket path only tells Xcode how to reach the local X8 service. It does not
+choose the remote storage. Macs share results when their X8 services use the
+same remote cache. For example, CI can write results and developer Macs can
+read them. A read-only Mac can reuse saved results, but cannot publish new
+ones for other machines.
 
-For the default prefix-mapped setup, use Xcode 27 or later. Xcode.app settings
-reach targets defined in the Xcode project, but do not propagate to targets in
-local Swift packages. Those package targets use the cache when you build with
-`x8 xcodebuild`, which passes settings directly to the build. The [prefix
-mapping guide](https://ryu0118.github.io/x8/documentation/prefixmapping) has
-the details and other portability limits.
+## What happens during a build?
+
+For each compilation, Xcode can use a saved result from either cache:
+
+- **On this Mac:** Xcode reuses a result already in `DerivedData`.
+- **In remote storage:** Xcode asks the local X8 service, which looks in the
+  shared cache. Xcode reuses the result if it matches the current compilation.
+- **No saved result:** Xcode compiles locally. X8 saves the result to remote
+  storage only if this machine's storage settings allow writes.
+- **Remote storage error:** X8 lets Xcode compile locally so the build can
+  continue.
+
+Xcode reuses a remote result only when the compilation inputs match. The
+same source can still produce a different result with another Xcode or
+compiler version, compiler options, build settings, or dependency versions.
+A cache miss is normal: Xcode compiles that work locally and the build
+continues.
+
+Prefix mapping handles one common cause of misses: the same checkout living
+at different paths on different Macs. For example, X8 can map
+`/Users/aya/Code/MyApp` and `/Users/ken/Code/MyApp` to the same cache path,
+`/^workspace`. The folders stay where they are. Prefix mapping handles paths
+only; it cannot make different compiler inputs equivalent. The default
+prefix-mapped setup requires Xcode 27 or later. See
+[Prefix mapping and cache portability](https://ryu0118.github.io/x8/documentation/prefixmapping)
+for details and other limits.
+
+## Which targets use the cache from Xcode.app?
+
+When you add X8's settings in Xcode.app, they apply to targets declared in
+your Xcode project. Xcode.app does not pass them to targets in local Swift
+packages, so those package targets do not use X8's remote cache in GUI builds.
+
+X8 settings reach these targets depending on how you start the build:
+
+| Build method | Xcode project targets | Local Swift package targets |
+| --- | --- | --- |
+| `x8 xcodebuild` | Yes | Yes |
+| Xcode.app | Yes | No |
+
+So an Xcode.app build can use the remote cache for your app target while
+building its local package dependencies without it. To enable the remote cache
+for those package targets too, build with `x8 xcodebuild`. The [prefix mapping
+guide](https://ryu0118.github.io/x8/documentation/prefixmapping) explains this
+Xcode.app limitation and other portability limits.
 
 ## If builds do not reuse results
 
