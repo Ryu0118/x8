@@ -100,33 +100,6 @@ same remote cache. For example, CI can write results and developer Macs can
 read them. A read-only Mac can reuse saved results, but cannot publish new
 ones for other machines.
 
-## What happens during a build?
-
-For each compilation, Xcode can use a saved result from either cache:
-
-- **On this Mac:** Xcode reuses a result already in `DerivedData`.
-- **In remote storage:** Xcode asks the local X8 service, which looks in the
-  shared cache. Xcode reuses the result if it matches the current compilation.
-- **No saved result:** Xcode compiles locally. X8 saves the result to remote
-  storage only if this machine's storage settings allow writes.
-- **Remote storage error:** X8 lets Xcode compile locally so the build can
-  continue.
-
-Xcode reuses a remote result only when the compilation inputs match. The
-same source can still produce a different result with another Xcode or
-compiler version, compiler options, build settings, or dependency versions.
-A cache miss is normal: Xcode compiles that work locally and the build
-continues.
-
-Prefix mapping handles one common cause of misses: the same checkout living
-at different paths on different Macs. For example, X8 can map
-`/Users/aya/Code/MyApp` and `/Users/ken/Code/MyApp` to the same cache path,
-`/^workspace`. The folders stay where they are. Prefix mapping handles paths
-only; it cannot make different compiler inputs equivalent. The default
-prefix-mapped setup requires Xcode 27 or later. See
-[Prefix mapping and cache portability](https://ryu0118.github.io/x8/documentation/prefixmapping)
-for details and other limits.
-
 ## Which targets use the cache from Xcode.app?
 
 When you add X8's settings in Xcode.app, they apply to targets declared in
