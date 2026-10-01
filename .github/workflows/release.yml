@@ -61,8 +61,10 @@ jobs:
         run: swift build -c release --traits S3 --arch arm64 --arch x86_64
 
       - name: Create Archive
+        id: create_archive
         run: |
           BIN_DIR="$(swift build -c release --traits S3 --arch arm64 --arch x86_64 --show-bin-path)"
+          echo "bin_dir=$BIN_DIR" >> "$GITHUB_OUTPUT"
           mkdir -p .build/release-assets
           tar -czvf ".build/release-assets/x8-${VERSION}-darwin-universal.tar.gz" \
             -C "$BIN_DIR" x8
@@ -83,18 +85,51 @@ jobs:
             .build/release-assets/x8-${{ inputs.version }}-darwin-universal.tar.gz.sha256
           if-no-files-found: error
 
-      - uses: giginet/github-action-artifactbundle@97117bc42b44f33e0d04b543b815ad9f3079f25e # v2
-        id: artifactbundle
-        with:
-          artifact_name: x8
-          version: ${{ inputs.version }}
+      - name: Create Artifact Bundle
+        env:
+          BIN_DIR: ${{ steps.create_archive.outputs.bin_dir }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          BUNDLE=".build/release-assets/x8.artifactbundle"
+          BUNDLE_ZIP="x8-${VERSION}.artifactbundle.zip"
+          BINARY="$BIN_DIR/x8"
+
+          test -x "$BINARY"
+          mkdir -p "$BUNDLE/x8-macos/bin"
+          cp "$BINARY" "$BUNDLE/x8-macos/bin/x8"
+          chmod +x "$BUNDLE/x8-macos/bin/x8"
+
+          cat > "$BUNDLE/info.json" <<EOF
+          {
+            "schemaVersion": "1.0",
+            "artifacts": {
+              "x8": {
+                "version": "${VERSION}",
+                "type": "executable",
+                "variants": [
+                  {
+                    "path": "x8-macos/bin/x8",
+                    "supportedTriples": ["x86_64-apple-macosx", "arm64-apple-macosx"]
+                  }
+                ]
+              }
+            }
+          }
+          EOF
+
+          (
+            cd .build/release-assets
+            zip -r "$BUNDLE_ZIP" x8.artifactbundle
+            shasum -a 256 "$BUNDLE_ZIP" > "$BUNDLE_ZIP.sha256"
+          )
 
       - name: Upload artifact bundle
         uses: actions/upload-artifact@v6
         with:
           name: x8-artifactbundle
           path: |
-            ${{ steps.artifactbundle.outputs.bundle_path }}
+            .build/release-assets/x8-${{ inputs.version }}.artifactbundle.zip
+            .build/release-assets/x8-${{ inputs.version }}.artifactbundle.zip.sha256
           if-no-files-found: error
 
   # Version bump + push only after the build succeeds.
