@@ -235,10 +235,6 @@ from a public URL without credentials, and pinning the socket path.
 | `x8 doctor` | Check configuration, storage access, and the local proxy. |
 | `x8 cache purge` | Plan and optionally delete eligible cache records. |
 
-Run `x8 help <subcommand>` for the full flag reference. Browse the [published
-documentation](https://ryu0118.github.io/x8/documentation/x8cli/) for API and
-configuration guides.
-
 ## License
 
 x8 is available under the MIT License. See [LICENSE](LICENSE) for details.
