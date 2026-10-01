@@ -62,9 +62,15 @@ jobs:
 
       - name: Create Archive
         run: |
-          cd .build/apple/Products/Release
-          tar -czvf "x8-${VERSION}-darwin-universal.tar.gz" x8
-          shasum -a 256 "x8-${VERSION}-darwin-universal.tar.gz" > "x8-${VERSION}-darwin-universal.tar.gz.sha256"
+          BIN_DIR="$(swift build -c release --traits S3 --arch arm64 --arch x86_64 --show-bin-path)"
+          mkdir -p .build/release-assets
+          tar -czvf ".build/release-assets/x8-${VERSION}-darwin-universal.tar.gz" \
+            -C "$BIN_DIR" x8
+          (
+            cd .build/release-assets
+            shasum -a 256 "x8-${VERSION}-darwin-universal.tar.gz" \
+              > "x8-${VERSION}-darwin-universal.tar.gz.sha256"
+          )
         env:
           VERSION: ${{ inputs.version }}
 
@@ -73,8 +79,8 @@ jobs:
         with:
           name: x8-darwin-universal
           path: |
-            .build/apple/Products/Release/x8-${{ inputs.version }}-darwin-universal.tar.gz
-            .build/apple/Products/Release/x8-${{ inputs.version }}-darwin-universal.tar.gz.sha256
+            .build/release-assets/x8-${{ inputs.version }}-darwin-universal.tar.gz
+            .build/release-assets/x8-${{ inputs.version }}-darwin-universal.tar.gz.sha256
           if-no-files-found: error
 
       - uses: giginet/github-action-artifactbundle@97117bc42b44f33e0d04b543b815ad9f3079f25e # v2
