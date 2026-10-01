@@ -446,12 +446,8 @@ private struct FailingBatchAdministration: CacheAdministration {
     }
 }
 
-/// Records the peak number of concurrent `references(of:)` calls, so a test
-/// can assert the planner's traversal stays within its concurrency bound.
-///
-/// Uses a plain `Mutex` rather than actor isolation for the counter itself:
-/// wrapping this type in an actor would serialize every call through it and
-/// defeat the measurement it exists to take.
+/// Records overlapping `references(of:)` calls so tests can assert the
+/// planner's traversal stays within its concurrency bound.
 private struct ConcurrencyTrackingReferenceReader: CASReferenceReader, Sendable {
     private let wrapped: any CASReferenceReader
     private let counter = ConcurrencyCounter()
@@ -465,7 +461,7 @@ private struct ConcurrencyTrackingReferenceReader: CASReferenceReader, Sendable 
     }
 
     func references(of id: CASDataID) async throws -> [CASDataID]? {
-        await counter.enter()
+        await counter.enterAndWaitForOverlap()
         do {
             let result = try await wrapped.references(of: id)
             await counter.exit()
@@ -480,10 +476,21 @@ private struct ConcurrencyTrackingReferenceReader: CASReferenceReader, Sendable 
 private actor ConcurrencyCounter {
     private var inFlight = 0
     private(set) var peak = 0
+    private var overlapWaiter: CheckedContinuation<Void, Never>?
 
-    func enter() {
+    func enterAndWaitForOverlap() async {
         inFlight += 1
         peak = Swift.max(peak, inFlight)
+        guard inFlight > 1 else {
+            // Keep the first read in flight until a peer arrives.
+            await withCheckedContinuation { continuation in
+                overlapWaiter = continuation
+            }
+            return
+        }
+
+        overlapWaiter?.resume()
+        overlapWaiter = nil
     }
 
     func exit() {
