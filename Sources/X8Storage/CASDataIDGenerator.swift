@@ -15,11 +15,9 @@ package enum CASDataIDGenerator {
         for bytes: Data,
         references: [CASDataID] = []
     ) -> CASDataID {
-        var hasher = SHA256()
-        hasher.update(data: Data("X8-CAS-v1".utf8))
+        var hasher = makeHasher()
         hasher.update(data: bytes)
-        updateHasher(&hasher, with: references)
-        return CASDataID(rawValue: Data(hasher.finalize()))
+        return finalize(&hasher, references: references)
     }
 
     /// Creates the same identifier while consuming a lazy payload stream.
@@ -27,14 +25,58 @@ package enum CASDataIDGenerator {
         for stream: ByteStream,
         references: [CASDataID] = []
     ) async throws -> CASDataID {
-        var hasher = SHA256()
-        hasher.update(data: Data("X8-CAS-v1".utf8))
+        var hasher = makeHasher()
 
         for try await chunk in stream {
             try Task.checkCancellation()
             hasher.update(data: chunk)
         }
 
+        return finalize(&hasher, references: references)
+    }
+
+    /// Returns a lazy stream that forwards `stream` while re-deriving its identifier.
+    ///
+    /// Chunks are passed through unchanged as they are hashed, so the payload
+    /// is never buffered. When the source completes, the stream throws
+    /// `CASDataIntegrityError` instead of finishing if the payload and
+    /// `references` do not produce `expected`. A consumer must therefore read
+    /// to the end before it treats the bytes as a cache hit.
+    package static func verifying(
+        _ stream: ByteStream,
+        references: [CASDataID],
+        expected: CASDataID
+    ) -> ByteStream {
+        ByteStream {
+            var iterator = stream.makeAsyncIterator()
+            var hasher = makeHasher()
+            var finished = false
+            return ByteStream.AsyncIterator {
+                guard !finished else { return nil }
+                if let chunk = try await iterator.next() {
+                    hasher.update(data: chunk)
+                    return chunk
+                }
+
+                finished = true
+                guard finalize(&hasher, references: references) == expected else {
+                    throw CASDataIntegrityError(id: expected)
+                }
+                return nil
+            }
+        }
+    }
+
+    private static func makeHasher() -> SHA256 {
+        var hasher = SHA256()
+        hasher.update(data: Data("X8-CAS-v1".utf8))
+        return hasher
+    }
+
+    private static func finalize(
+        _ hasher: inout SHA256,
+        references: [CASDataID]
+    ) -> CASDataID {
         updateHasher(&hasher, with: references)
         return CASDataID(rawValue: Data(hasher.finalize()))
     }

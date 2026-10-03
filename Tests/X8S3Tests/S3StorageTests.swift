@@ -120,8 +120,8 @@
                 configuration: .init(bucket: "foo"),
                 objectClient: client
             )
-            let id = CASDataID(rawValue: Data([0xAA]))
             let references = [CASDataID(rawValue: Data([0xBB, 0xBC]))]
+            let id = CASDataIDGenerator.id(for: Data([0x01, 0x02, 0x03]), references: references)
             let envelope = S3StorageCodec.encodeCAS(
                 S3CASRecord(bytes: Data([0x01, 0x02, 0x03]), references: references)
             )
@@ -141,6 +141,52 @@
             #expect(object.references == references)
             #expect(bytes == Data([0x01, 0x02, 0x03]))
             #expect(try await TestByteStream.collect(blob) == Data([0x01, 0x02, 0x03]))
+        }
+
+        @Test
+        func rejectsATamperedCASPayloadForEveryReadPath() async throws {
+            let client = FakeS3ObjectClient()
+            let storage = S3Storage(
+                configuration: .init(bucket: "foo"),
+                objectClient: client
+            )
+            let id = try await storage.put(
+                CASObject(bytes: TestByteStream.make([Data([0x01, 0x02])]), references: [])
+            )
+            let tampered = S3StorageCodec.encodeCAS(S3CASRecord(bytes: Data([0x01, 0xFF]), references: []))
+            await client.seed([tampered], for: "cas/\(id.rawValue.hexString)")
+
+            let object = try #require(await storage.get(id: id))
+            await #expect(throws: CASDataIntegrityError(id: id)) {
+                _ = try await TestByteStream.collect(object.bytes)
+            }
+            let blob = try #require(await storage.load(id: id))
+            await #expect(throws: CASDataIntegrityError(id: id)) {
+                _ = try await TestByteStream.collect(blob)
+            }
+        }
+
+        @Test
+        func rejectsTamperedCASReferences() async throws {
+            let client = FakeS3ObjectClient()
+            let storage = S3Storage(
+                configuration: .init(bucket: "foo"),
+                objectClient: client
+            )
+            let references = [CASDataID(rawValue: Data([0x01]))]
+            let id = try await storage.put(
+                CASObject(bytes: TestByteStream.make([Data([0x02])]), references: references)
+            )
+            let tampered = S3StorageCodec.encodeCAS(
+                S3CASRecord(bytes: Data([0x02]), references: [CASDataID(rawValue: Data([0x09]))])
+            )
+            await client.seed([tampered], for: "cas/\(id.rawValue.hexString)")
+
+            let object = try #require(await storage.get(id: id))
+
+            await #expect(throws: CASDataIntegrityError(id: id)) {
+                _ = try await TestByteStream.collect(object.bytes)
+            }
         }
 
         @Test
