@@ -186,6 +186,31 @@ struct XcodeCacheServiceTests {
         #expect(response.error.description_p == "backend failure")
     }
 
+    @Test(arguments: [false, true])
+    func corruptCASPayloadBecomesErrorWithoutLeavingAResponseFile(writeToDisk: Bool) async throws {
+        let metrics = X8CacheMetricsStore()
+        let responseDirectory = FileManager.default.temporaryDirectory
+            .appending(path: "x8-response-" + UUID().uuidString)
+        let fileStore = XcodeCacheResponseFileStore(directory: responseDirectory)
+        let service = XcodeCacheCASService(
+            casStore: CorruptCASStorage(),
+            responseFileStore: fileStore,
+            metrics: metrics
+        )
+        defer { fileStore.cleanup() }
+        var request = CompilationCacheService_Cas_V1_CASLoadRequest()
+        request.casID = makeWireID(CorruptCASStorage.id)
+        request.writeToDisk = writeToDisk
+
+        let response = try await service.load(request: request, context: testContext())
+
+        #expect(response.outcome == .error)
+        #expect(response.error.description_p == CASDataIntegrityError(id: CorruptCASStorage.id).description)
+        let leftovers = (try? FileManager.default.contentsOfDirectory(atPath: responseDirectory.path)) ?? []
+        #expect(leftovers.isEmpty)
+        #expect(await metrics.snapshot().remoteErrors == 1)
+    }
+
     @Test
     func casPutBackendFailureRecordsRemoteError() async throws {
         let metrics = X8CacheMetricsStore()
@@ -278,6 +303,27 @@ private struct FailingStorage: CASStore, ActionCacheStore, Sendable {
     }
 
     func putValue(_: ActionCacheValue, for _: ActionCacheKey) async throws {
+        throw BackendFailure()
+    }
+}
+
+/// Serves a payload that does not hash to the identifier it is read under.
+private struct CorruptCASStorage: CASStore, Sendable {
+    static let id = CASDataIDGenerator.id(for: Data([0x01]), references: [])
+
+    func get(id: CASDataID) async throws -> CASObject? {
+        try await load(id: id).map { CASObject(bytes: $0, references: []) }
+    }
+
+    func put(_: CASObject) async throws -> CASDataID {
+        throw BackendFailure()
+    }
+
+    func load(id: CASDataID) async throws -> ByteStream? {
+        CASDataIDGenerator.verifying(ByteStreamSupport.make(Data([0xFF])), references: [], expected: id)
+    }
+
+    func save(_: ByteStream) async throws -> CASDataID {
         throw BackendFailure()
     }
 }
