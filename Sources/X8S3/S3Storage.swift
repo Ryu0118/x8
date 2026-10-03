@@ -214,6 +214,10 @@
         }
 
         /// Reads the provider envelope and returns references plus a lazy payload stream.
+        ///
+        /// The payload stream throws `CASDataIntegrityError` at its end when
+        /// the stored payload and references do not hash to `id`, so callers
+        /// must consume it fully before returning the bytes as a hit.
         package func getCASRecord(
             id: CASDataID
         ) async throws -> (references: [CASDataID], bytes: ByteStream)? {
@@ -221,7 +225,15 @@
                 key: keySpace.cas(id: id.rawValue),
                 kind: .cas
             ) else { return nil }
-            return try await S3StorageCodec.decodeCASHeader(from: stream)
+            let record = try await S3StorageCodec.decodeCASHeader(from: stream)
+
+            // Every CAS key is the digest X8 derived on write; bucket contents are untrusted.
+            let verified = CASDataIDGenerator.verifying(
+                record.bytes,
+                references: record.references,
+                expected: id
+            )
+            return (record.references, verified)
         }
 
         private func storeCAS(

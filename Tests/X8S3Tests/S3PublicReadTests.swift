@@ -13,10 +13,10 @@
         @Test
         func readsCASObjectFromPublicURL() async throws {
             let transport = FakePublicHTTPTransport()
-            let id = CASDataID(rawValue: Data([0xAA]))
             let references = [CASDataID(rawValue: Data([0xBB]))]
+            let id = CASDataIDGenerator.id(for: Data([0x01, 0x02]), references: references)
             let envelope = S3StorageCodec.encodeCAS(S3CASRecord(bytes: Data([0x01, 0x02]), references: references))
-            await transport.respond(to: Self.baseURL + "cas/aa", status: 200, body: envelope)
+            await transport.respond(to: Self.baseURL + "cas/\(id.rawValue.hexString)", status: 200, body: envelope)
             let storage = try PublicReadFixture.publicOnlyStorage(transport: transport)
 
             let object = try #require(try await storage.get(id: id))
