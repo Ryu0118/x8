@@ -55,3 +55,4 @@ These rules apply repository-wide and are intentionally partitioned by concern:
 - Keep Soto and S3-specific configuration out of `X8Core` and `X8Storage`.
 - Verify the Xcode compilation-cache wire protocol before designing protocol-specific APIs.
 - Keep generated gRPC sources under `Sources/X8Kit/Generated`; use the Kit proxy as the reusable internal surface behind `X8CLI`.
+- When documentation and the existing code disagree, follow the conventions used in the existing code, and in your final reply list every inconsistency you found between the documentation and the code.
